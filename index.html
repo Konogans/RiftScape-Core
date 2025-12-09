@@ -1,0 +1,57 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>RiftScape Survival</title>
+    <link rel="stylesheet" href="css/style.css">
+    
+    <!-- Libraries -->
+    <script src="https://unpkg.com/three@0.147.0/build/three.min.js"></script>
+    <script src="https://unpkg.com/three@0.147.0/examples/js/loaders/GLTFLoader.js"></script>
+</head>
+<body>
+    <div id="ui">
+        <div id="debug"></div>
+        <div id="health-ui">
+            <div class="pool-container"><div class="pool-label">Health</div><div class="pool-bar"><div class="pool-bar-fill pool-bar-max" id="health-max"></div><div class="pool-bar-fill pool-bar-active" id="health-active"></div></div><div class="pool-bar reserve-bar"><div class="pool-bar-fill" id="health-reserve"></div></div></div>
+            <div id="action-bar"><div id="action-bar-fill"></div></div><div id="action-label">Ready</div>
+            <div id="dash-bar"><div id="dash-bar-fill"></div></div><div id="dash-label">DASH</div>
+            <div id="slam-bar"><div id="slam-bar-fill"></div></div><div id="slam-label">SLAM</div>
+        </div>
+        <div id="controls"><span>WASD</span> Move<br><span>SPACE</span> Attack<br><span>SHIFT</span> Dash<br><span>Q</span> Slam</div>
+        <div id="run-stats"><div class="stat-label">Time</div><div class="stat-value" id="stat-time">0:00</div><br><div class="stat-label">Kills</div><div class="stat-value" id="stat-kills">0</div><br><div class="stat-label essence-label">◆ Essence</div><div class="stat-value essence-value" id="stat-essence">0</div></div>
+        <div id="game-over"><h1>FALLEN</h1><div class="final-stats"><div class="stat-label">Time Survived</div><span id="final-time">0:00</span><div class="stat-label">Enemies Slain</div><span id="final-kills">0</span></div><div class="essence-earned">+<span id="essence-earned">0</span> Essence</div><button id="restart-btn">Quick Restart</button><button id="outpost-btn">Return to Outpost</button></div>
+        <div id="outpost" class="hidden"><h1>THE OUTPOST</h1><div class="subtitle">A refuge between rifts</div><div class="stats-bar"><div class="stat">Runs: <span class="stat-value" id="total-runs">0</span></div><div class="stat">Best Time: <span class="stat-value" id="best-time">0:00</span></div><div class="stat">Best Kills: <span class="stat-value" id="best-kills">0</span></div></div><div class="essence-display">◆ <span id="current-essence">0</span> Essence</div><div class="affinity-display"><div class="affinity-bar magic"><div class="label">Magic Affinity</div><div class="value" id="magic-affinity">0</div></div><div class="affinity-bar tech"><div class="label">Tech Affinity</div><div class="value" id="tech-affinity">0</div></div></div><div class="section-title">Upgrades</div><div class="upgrades-grid" id="upgrades-grid"></div><button class="enter-rift-btn" id="enter-rift-btn">ENTER THE RIFT</button><button class="reset-btn" id="reset-progress-btn">Reset All Progress</button></div>
+    </div>
+
+    <!-- 1. Data Registries (Load these FIRST so WorldManager can use them) -->
+    <script src="js/data/UpgradeRegistry.js"></script>
+    <script src="js/data/PickupRegistry.js"></script>
+    <script src="js/data/BiomeRegistry.js"></script>
+    <script src="js/data/AbilityRegistry.js"></script>
+    <script src="js/data/EntityRegistry.js"></script>
+
+    <!-- 2. Core Utilities -->
+    <script src="js/core/Input.js"></script>
+    <script src="js/core/Utils.js"></script>
+    <script src="js/core/ModelLoader.js"></script>
+    
+    <!-- 3. World Manager (Depends on BiomeRegistry) -->
+    <script src="js/core/WorldManager.js"></script>
+
+    <!-- 4. Entities (Depends on Core) -->
+    <script src="js/entities/Projectile.js"></script>
+    <script src="js/entities/Pickup.js"></script>
+    <script src="js/entities/Portal.js"></script>
+    <script src="js/entities/Enemy.js"></script>
+    <script src="js/entities/Player.js"></script>
+
+    <!-- 5. Main Game -->
+    <script src="js/core/Game.js"></script>
+    <script>
+        window.addEventListener('load', () => { window.game = new Game(); });
+    </script>
+</body>
+</html>
