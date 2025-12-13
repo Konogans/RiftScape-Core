@@ -308,20 +308,50 @@ class Enemy {
     dropLoot() {
         const loot = this.def.loot;
         if (!loot) return;
-        
+
         const x = this.mesh.position.x;
         const z = this.mesh.position.z;
-        
+
         for (const [type, def] of Object.entries(loot)) {
             if (Math.random() < def.chance) {
-                const value = def.min !== undefined 
+                const value = def.min !== undefined
                     ? def.min + Math.floor(Math.random() * (def.max - def.min + 1))
                     : def.value || 1;
                 this.game.spawnPickup(x + (Math.random() - 0.5), z + (Math.random() - 0.5), type, value);
             }
         }
     }
-    
+
+    teleportNearPlayer() {
+        // Find a valid position near the player (similar to spawnEnemy logic)
+        const playerPos = this.game.player.mesh.position;
+        let x, z, attempts = 0;
+        let valid = false;
+
+        while (!valid && attempts < 30) {
+            const angle = Math.random() * Math.PI * 2;
+            const dist = 12 + Math.random() * 8; // Spawn 12-20 units away
+            x = playerPos.x + Math.cos(angle) * dist;
+            z = playerPos.z + Math.sin(angle) * dist;
+
+            if (this.game.world) {
+                if (!this.game.world.checkCollision(x, z, 0.4)) {
+                    valid = true;
+                }
+            } else {
+                valid = true;
+            }
+            attempts++;
+        }
+
+        if (valid) {
+            this.mesh.position.set(x, this.baseY, z);
+            // Update lastPos for animation system
+            this.lastPos = { x, z };
+        }
+        // If no valid position found, enemy stays where it is (rare edge case)
+    }
+
 	update(deltaTime, elapsed) {
         // Handle death animation timer
         if (this.pendingRemoval) {
@@ -334,6 +364,13 @@ class Enemy {
         }
 
         if (this.dead) return;
+
+        // Leash system: teleport enemies that are too far from player
+        const playerPos = this.game.player.mesh.position;
+        const distToPlayer = this.mesh.position.distanceTo(playerPos);
+        if (distToPlayer > 40) {
+            this.teleportNearPlayer();
+        }
 
         this.health.update(deltaTime);
 
