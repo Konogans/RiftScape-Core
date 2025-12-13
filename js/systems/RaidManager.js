@@ -101,6 +101,16 @@ class RaidManager {
             // Update Boss Bar
             this.game.hud.updateBoss(true, this.game.currentBoss.def.name, this.game.currentBoss.health.active, this.game.currentBoss.health.maxActive);
 
+            // FIX: Also update raid HUD so gate health is visible during boss fight
+            const currentWaveNum = Math.max(1, this.wave - 1);
+            const globalWave = ((this.raidLevel - 1) * 5) + currentWaveNum;
+            this.game.hud.updateRaid(
+                true, hp, maxHp,
+                globalWave,
+                this.timer, activeEnemies,
+                true // Boss wave is always "final"
+            );
+
             // Wait for boss death...
             return;
         } else if (this.game.currentBoss) {
