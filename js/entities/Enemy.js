@@ -102,6 +102,20 @@ class Enemy {
             this.hasModel = true;
             this.baseY = 0;
 
+            // Store original materials for hit flash effect
+            this.modelMaterials = [];
+            this.mesh.traverse((child) => {
+                if (child.isMesh && child.material) {
+                    const mat = child.material;
+                    this.modelMaterials.push({
+                        material: mat,
+                        color: mat.color ? mat.color.getHex() : null,
+                        emissive: mat.emissive ? mat.emissive.getHex() : null,
+                        emissiveIntensity: mat.emissiveIntensity || 0
+                    });
+                }
+            });
+
             if (parent) parent.add(this.mesh);
             else if (this.game.scene) this.game.scene.add(this.mesh);
 
@@ -125,15 +139,22 @@ class Enemy {
                         action.clampWhenFinished = true;
                         this.attackClipAction = action;
 
-                        // OPTION A: Sync animation speed to AttackSystem timing
-                        // We want the "hit" moment (50% of clip) to align with windupTime
+                        // OPTION A: Sync animation to play fully over attack duration
+                        // Full animation plays over (windup + action + cooldown)
                         if (this.def.attackTiming) {
-                            const hitPercent = 0.5; // Hit lands at 50% of animation
-                            const normalHitTime = clip.duration * hitPercent * 1000; // ms
-                            const desiredHitTime = this.def.attackTiming.windup; // ms
-                            const timeScale = normalHitTime / desiredHitTime;
+                            const t = this.def.attackTiming;
+                            const totalAttackDuration = (t.windup + t.action + t.cooldown) / 1000; // seconds
+                            const timeScale = clip.duration / totalAttackDuration;
                             action.setEffectiveTimeScale(timeScale);
                         }
+                    }
+
+                    // Special handling for death animations
+                    if (clip.name.includes('Death') || clip.name.includes('Dead') || clip.name.includes('Die')) {
+                        action.setLoop(THREE.LoopOnce, 0);
+                        action.clampWhenFinished = true;
+                        this.deathClipAction = action;
+                        this.deathClipDuration = clip.duration;
                     }
                 });
 
@@ -200,19 +221,25 @@ class Enemy {
     takeDamage(amount) {
         if (this.dead) return;
         this.health.delta(-amount);
-        
-        // Hit flash
-        if (!this.baseHex) this.baseHex = this.material?.color?.getHex();
-        if (!this.baseEmissive) this.baseEmissive = this.material?.emissive?.getHex();
-        
-        if (this.material) {
+
+        // Hit flash - handle both cube and model materials
+        if (this.hasModel && this.modelMaterials) {
+            // Flash all model materials white
+            for (const entry of this.modelMaterials) {
+                const mat = entry.material;
+                if (mat.color) mat.color.setHex(0xffffff);
+                if (mat.emissive) mat.emissive.setHex(0xffffff);
+                mat.emissiveIntensity = 1.0;
+            }
+        } else if (this.material) {
+            // Flash cube material
             this.material.color.setHex(0xffffff);
             this.material.emissive.setHex(0xffffff);
             this.material.emissiveIntensity = 1.0;
         }
-        
+
         this.flashTimer = 0.08;
-        
+
         // Floating damage text
         if (this.game.spawnFloatingText) {
             this.game.spawnFloatingText(
@@ -227,13 +254,32 @@ class Enemy {
     onDeath() {
         if (this.dead) return;
         this.dead = true;
-        
+
         this.game.addKill();
+
+        // If we have a death animation, play it before removing
+        if (this.deathClipAction && this.mixer) {
+            // Find the death animation name (could be Death, Dead, or Die)
+            const deathAnimName = Object.keys(this.animActions || {}).find(
+                name => name.includes('Death') || name.includes('Dead') || name.includes('Die')
+            );
+            if (deathAnimName) this.playAnim(deathAnimName);
+            // Delay particle burst and removal until animation finishes
+            const deathDuration = this.deathClipDuration || 1.0;
+            this.deathTimer = deathDuration;
+            this.pendingRemoval = true;
+        } else {
+            // No death animation - immediate removal
+            this.finalizeDeath();
+        }
+    }
+
+    finalizeDeath() {
         this.game.spawnParticleBurst(this.mesh.position.x, this.mesh.position.z, this.def.color, 10);
-        
+
         // Loot drop (from definition)
         this.dropLoot();
-        
+
         this.game.safeRemove(this, this.game.enemies);
     }
     
@@ -255,6 +301,16 @@ class Enemy {
     }
     
 	update(deltaTime, elapsed) {
+        // Handle death animation timer
+        if (this.pendingRemoval) {
+            if (this.mixer) this.mixer.update(deltaTime);
+            this.deathTimer -= deltaTime;
+            if (this.deathTimer <= 0) {
+                this.finalizeDeath();
+            }
+            return;
+        }
+
         if (this.dead) return;
 
         this.health.update(deltaTime);
@@ -296,22 +352,26 @@ class Enemy {
             // Animation Attack - use new system
             this.playAnim('Attack');
         }
-		
-		if (this.flashTimer > 0) {
+
+        // Flash timer reset
+        if (this.flashTimer > 0) {
             this.flashTimer -= deltaTime;
-            if (this.flashTimer <= 0 && this.material) {
-                // FIX: FORCE FACTORY RESET
-                // Don't trust 'baseHex' or 'baseEmissive' because they might have captured
-                // a temporary attack state (Windup Red). 
-                // Always return to the Definition color.
-                
-                this.material.color.setHex(this.def.color);
-                this.material.emissive.setHex(this.def.emissive);
-                this.material.emissiveIntensity = 0.3;
-                
-                // Clear the cache just to be clean
-                this.baseHex = null;
-                this.baseEmissive = null;
+            if (this.flashTimer <= 0) {
+                // Restore materials after flash
+                if (this.hasModel && this.modelMaterials) {
+                    // Restore all model materials to original colors
+                    for (const entry of this.modelMaterials) {
+                        const mat = entry.material;
+                        if (mat.color && entry.color !== null) mat.color.setHex(entry.color);
+                        if (mat.emissive && entry.emissive !== null) mat.emissive.setHex(entry.emissive);
+                        mat.emissiveIntensity = entry.emissiveIntensity;
+                    }
+                } else if (this.material) {
+                    // Restore cube material
+                    this.material.color.setHex(this.def.color);
+                    this.material.emissive.setHex(this.def.emissive);
+                    this.material.emissiveIntensity = 0.3;
+                }
             }
         }
     }
