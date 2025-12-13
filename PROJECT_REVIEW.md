@@ -54,9 +54,13 @@ RiftScape Core is a **well-architected browser-based action RPG** built on vanil
 | Issue | Impact | Remediation |
 |-------|--------|-------------|
 | No Type Safety | Runtime errors possible | Add JSDoc annotations for critical APIs |
-| Animation Code Scattered | Hard to maintain | Centralize in entity base or system |
+| **Legacy Model Loading** | Entity model code untested | Port working code from `mods/riftling_remastered.js` |
+| Animation Code Scattered | Hard to maintain | Integrate V4.4 animation system into core |
 | Sound System Incomplete | Missing music support | Implement Web Audio file loading |
 | Some Memory Leaks | Long session degradation | Audit all `dispose()` methods |
+
+> **Note:** The model loading code in `js/entities/*.js` files is legacy and untested.
+> The proven working implementation is in `mods/riftling_remastered.js` (V4.4).
 
 ---
 
@@ -153,49 +157,87 @@ Based on impact and dependencies, here's the recommended priority order:
 
 **Files:** `js/entities/Enemy.js`
 
-**Implementation Steps:**
-1. Add animation state tracking properties:
+**Reference Implementation:** `mods/riftling_remastered.js` (V4.4) - This is the working, tested implementation.
+
+> **IMPORTANT:** The model loading code currently in entity files is legacy and untested.
+> The `riftling_remastered.js` mod provides the proven working example that should be
+> integrated into the core.
+
+**Key Patterns from Working Implementation:**
+
+1. **Model Loading with GLTFLoader:**
    ```javascript
-   this.animState = 'idle';
-   this.animMixer = null;
-   this.animActions = {};
+   const gltfLoader = new THREE.GLTFLoader();
+   const glb = await new Promise((res, rej) => {
+       gltfLoader.load('models/Riftling_Clean.glb?v=' + (++counter), res, undefined, rej);
+   });
+   enemy.mesh = glb.scene;
+   enemy.mixer = new THREE.AnimationMixer(glb.scene);
    ```
 
-2. In constructor, after model loads:
+2. **Animation Action Setup:**
    ```javascript
-   if (gltf.animations && gltf.animations.length > 0) {
-       this.animMixer = new THREE.AnimationMixer(this.mesh);
-       gltf.animations.forEach(clip => {
-           this.animActions[clip.name.toLowerCase()] =
-               this.animMixer.clipAction(clip);
-       });
+   enemy.animActions = {};
+   glb.animations.forEach(clip => {
+       const action = enemy.mixer.clipAction(clip);
+       action.setLoop(THREE.LoopRepeat);
+       enemy.animActions[clip.name] = action;
+
+       // Special handling for attack animations
+       if (clip.name.includes('Attack')) {
+           action.setLoop(THREE.LoopOnce, 0);
+           action.clampWhenFinished = true;
+       }
+   });
+   ```
+
+3. **playAnim() Method with CrossFade:**
+   ```javascript
+   enemy.playAnim = function(name, fadeTime = 0.15) {
+       if (this.currentAnim === name || !this.animActions[name]) return;
+
+       const newAction = this.animActions[name];
+       if (this.currentAnim && this.animActions[this.currentAnim]) {
+           const oldAction = this.animActions[this.currentAnim];
+           newAction.reset().play();
+           newAction.crossFadeFrom(oldAction, fadeTime, true);
+       } else {
+           newAction.reset().play();
+       }
+       this.currentAnim = name;
+   };
+   ```
+
+4. **Attack Enforcement System (Critical!):**
+   ```javascript
+   // Prevents animation interruption during attack windup (0-75%)
+   const percentPlayed = attackAction.time / attackAction.getClip().duration;
+   const windupEndPercent = 0.50;  // Hit window starts
+   const actionEndPercent = 0.75;  // Recovery phase starts
+
+   if (percentPlayed < actionEndPercent) {
+       enemy.isAttackEnforced = true;
+       return; // BLOCKS movement/idle transitions
    }
    ```
 
-3. Add `setAnimation(name)` method:
+5. **Movement State Detection (Speed-based):**
    ```javascript
-   setAnimation(name) {
-       if (this.animState === name || !this.animActions[name]) return;
-       Object.values(this.animActions).forEach(a => a.stop());
-       this.animActions[name].reset().play();
-       this.animState = name;
-   }
+   const dx = pos.x - enemy.lastPos.x;
+   const dz = pos.z - enemy.lastPos.z;
+   const actualSpeed = Math.sqrt(dx*dx + dz*dz) / dt;
+
+   if (actualSpeed > 2.0) enemy.playAnim('Running');
+   else if (actualSpeed > 0.3) enemy.playAnim('Walking');
+   else enemy.playAnim('Idle');
    ```
 
-4. In `update()`, sync animation to state:
-   ```javascript
-   // Determine animation state
-   if (this.attackAction && this.attackAction.status !== 'idle') {
-       this.setAnimation('attack');
-   } else if (this.velocity && this.velocity.length() > 0.1) {
-       this.setAnimation('walk');
-   } else {
-       this.setAnimation('idle');
-   }
-
-   // Update mixer
-   if (this.animMixer) this.animMixer.update(dt);
-   ```
+**Integration Steps:**
+1. Port the `loadModel` patch logic directly into `Enemy.js` constructor
+2. Add the `playAnim()` method to Enemy prototype
+3. Port the update loop animation logic into `Enemy.update()`
+4. Remove animation code from `mods/` directory after core integration
+5. Test with Riftling_Clean.glb model
 
 #### Task 1.2: Fix Boss Memory Leak (B-002)
 
