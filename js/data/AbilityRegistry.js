@@ -385,11 +385,12 @@ AbilityRegistry.register('wrench', {
         
         // 2. Repair Structures
         const hitPos = p.mesh.position.clone().add(new THREE.Vector3(0,0,-1).applyEuler(p.mesh.rotation));
-        for (const e of game.entities) {
-            if (e instanceof Structure && e.mesh.position.distanceTo(hitPos) < 2.0) {
-                if (e.health < e.def.health) {
-                    e.health = Math.min(e.health + 10, e.def.health);
-                    game.spawnFloatingText(e.x, e.z, "REPAIR", 0x00ff00, 0.5);
+        for (const s of game.structures) {
+            if (s.dead) continue;
+            if (s.mesh.position.distanceTo(hitPos) < 2.0) {
+                if (s.health < s.def.health) {
+                    s.health = Math.min(s.health + 10, s.def.health);
+                    game.spawnFloatingText(s.x, s.z, "REPAIR", 0x00ff00, 0.5);
                 }
             }
         }

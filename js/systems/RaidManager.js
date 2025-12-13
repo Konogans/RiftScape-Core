@@ -44,6 +44,8 @@ class RaidManager {
         this.wave = 1;
         this.timer = 5.0;
         this.raidLevel = 1;
+        this.bossSpawnPending = false;
+        this.bossSpawnTimer = 0;
 
         // Stop any playing music
         if (this.game.sound) this.game.sound.stopMusic();
@@ -80,18 +82,30 @@ class RaidManager {
         
         this.timer -= dt;
         const activeEnemies = this.game.enemies.filter(e => !e.dead).length;
-        
+
+        // BOSS SPAWN COUNTDOWN (music plays, boss spawns after delay)
+        if (this.bossSpawnPending) {
+            this.bossSpawnTimer -= dt;
+            if (this.bossSpawnTimer <= 0) {
+                this.actuallySpawnBoss();
+            }
+            // Show countdown in HUD
+            if (this.game.hud) {
+                this.game.hud.updateDebug(`⚠ THREAT INCOMING: ${Math.ceil(this.bossSpawnTimer)}s ⚠`);
+            }
+            return;
+        }
+
         // BOSS STATE (If Boss is alive, pause wave timer/logic)
         if (this.game.currentBoss && !this.game.currentBoss.dead) {
             // Update Boss Bar
             this.game.hud.updateBoss(true, this.game.currentBoss.def.name, this.game.currentBoss.health.active, this.game.currentBoss.health.maxActive);
-            
+
             // Wait for boss death...
-            return; 
+            return;
         } else if (this.game.currentBoss) {
-            // Boss just died - stop music and clear boss state
+            // Boss just died - clear boss state (let music finish naturally)
             if (this.game.hud) this.game.hud.updateBoss(false);
-            this.game.sound.stopMusic();
             this.game.currentBoss = null;
         }
         
@@ -182,42 +196,44 @@ class RaidManager {
     }
 
     spawnBoss() {
-        this.game.hud.updateDebug(`⚠ WARNING: HIGH THREAT DETECTED ⚠`);
-        this.game.sound.play('error'); 
-        
-        const x = 0; 
-        const z = -35; 
-        
+        // Start boss music first (no loop - let it play through)
+        this.game.sound.playMusic('boss', false);
+        this.game.hud.updateDebug(`⚠ WARNING: HIGH THREAT INCOMING ⚠`);
+        this.game.sound.play('error');
+
+        // Delay actual boss spawn by 20 seconds for dramatic buildup
+        this.bossSpawnTimer = 20.0;
+        this.bossSpawnPending = true;
+    }
+
+    actuallySpawnBoss() {
+        this.bossSpawnPending = false;
+        this.game.hud.updateDebug(`⚠ THE HEADLINER HAS ARRIVED ⚠`);
+        this.game.sound.play('error');
+
+        const x = 0;
+        const z = -35;
+
         if (typeof Boss !== 'undefined') {
             const boss = new Boss(this.game, x, z, 'headliner');
-            
+
             // SCALING: Base * (1 + (Level * 0.5))
-            // Level 2 (First Boss) = 1 + 1.0 = 2.0x HP
-            // Base 300 -> 600 HP
-            const mult = 1 + (this.raidLevel * 0.5); 
-			
-			const def = EntityRegistry.get('headliner');
-			
-            // FIX: Scale ACTIVE and RESERVE together
-            // If we don't scale reserve, PointPool will clamp active health down.
+            const mult = 1 + (this.raidLevel * 0.5);
+            const def = EntityRegistry.get('headliner');
+
             boss.health.maxActive = Math.floor(def.health.active * mult);
             boss.health.active = boss.health.maxActive;
-            
             boss.health.maxReserve = Math.floor(def.health.reserve * mult);
             boss.health.reserve = boss.health.maxReserve;
-			
-			boss.damage = Math.ceil(def.damage * mult);
-            
-            boss.targetOverride = this.game.riftGate; 
-            
+            boss.damage = Math.ceil(def.damage * mult);
+
+            boss.targetOverride = this.game.riftGate;
+
             this.game.enemies.push(boss);
             this.game.entities.push(boss);
             this.game.scene.add(boss.mesh);
-            
-            this.game.currentBoss = boss;
 
-            // Start boss music
-            this.game.sound.playMusic('boss');
+            this.game.currentBoss = boss;
         } else {
             this.spawnWave();
         }

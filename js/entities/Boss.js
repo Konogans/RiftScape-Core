@@ -48,9 +48,10 @@ class Boss extends Enemy {
     update(deltaTime, elapsed) {
         if (this.dead) return;
         this.health.update(deltaTime);
-        
-        // REMOVED: this.updateBuffs(deltaTime);  <-- This line caused the crash
-        
+
+        // Update attack action state machine (required for damage to be dealt)
+        this.attackAction.update(deltaTime * 1000);
+
         // Flash timer logic
         if (this.flashTimer > 0) {
             this.flashTimer -= deltaTime;
