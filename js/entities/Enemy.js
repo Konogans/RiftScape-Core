@@ -134,10 +134,13 @@ class Enemy {
                     this.animActions[clip.name] = action;
 
                     // Special handling for attack animations
-                    if (clip.name.includes('Attack')) {
+                    // Supports: Attack, Skill_XX (alternative naming)
+                    const isAttack = clip.name.includes('Attack') || clip.name.startsWith('Skill');
+                    if (isAttack && !this.attackClipAction) {
                         action.setLoop(THREE.LoopOnce, 0);
                         action.clampWhenFinished = true;
                         this.attackClipAction = action;
+                        this.attackAnimName = clip.name; // Store actual name
 
                         // OPTION A: Sync animation to play fully over attack duration
                         // Full animation plays over (windup + action + cooldown)
@@ -151,11 +154,15 @@ class Enemy {
                     }
 
                     // Special handling for death animations
-                    if (clip.name.includes('Death') || clip.name.includes('Dead') || clip.name.includes('Die')) {
+                    // Supports: Death, Dead, Die, BeHit_FlyUp (alternative naming)
+                    const isDeath = clip.name.includes('Death') || clip.name.includes('Dead') ||
+                                    clip.name.includes('Die') || clip.name.includes('BeHit');
+                    if (isDeath && !this.deathClipAction) {
                         action.setLoop(THREE.LoopOnce, 0);
                         action.clampWhenFinished = true;
                         this.deathClipAction = action;
                         this.deathClipDuration = clip.duration;
+                        this.deathAnimName = clip.name; // Store actual name
                     }
                 });
 
@@ -174,13 +181,17 @@ class Enemy {
     playAnim(name, fadeTime = 0.15) {
         if (!this.animActions || this.currentAnim === name || !this.animActions[name]) return;
 
+        // Check if this is the attack animation (using stored name)
+        const isAttackAnim = this.attackAnimName && name === this.attackAnimName;
+
         // Reset attack state when transitioning to attack
-        if (name.includes('Attack')) {
+        if (isAttackAnim) {
             this.hasHitThisAttack = false;
         }
 
         // Stop previous attack action to release clampWhenFinished
-        if (this.attackClipAction && this.currentAnim && this.currentAnim.includes('Attack')) {
+        const wasAttackAnim = this.attackAnimName && this.currentAnim === this.attackAnimName;
+        if (this.attackClipAction && wasAttackAnim) {
             this.attackClipAction.stop();
         }
 
@@ -197,7 +208,7 @@ class Enemy {
         }
 
         // Re-apply attack animation timeScale after reset() clears it
-        if (name.includes('Attack') && this.attackTimeScale) {
+        if (isAttackAnim && this.attackTimeScale) {
             newAction.setEffectiveTimeScale(this.attackTimeScale);
         }
 
@@ -280,12 +291,8 @@ class Enemy {
         this.game.addKill();
 
         // If we have a death animation, play it before removing
-        if (this.deathClipAction && this.mixer) {
-            // Find the death animation name (could be Death, Dead, or Die)
-            const deathAnimName = Object.keys(this.animActions || {}).find(
-                name => name.includes('Death') || name.includes('Dead') || name.includes('Die')
-            );
-            if (deathAnimName) this.playAnim(deathAnimName);
+        if (this.deathClipAction && this.mixer && this.deathAnimName) {
+            this.playAnim(this.deathAnimName);
             // Delay particle burst and removal until animation finishes
             const deathDuration = this.deathClipDuration || 1.0;
             this.deathTimer = deathDuration;
@@ -410,8 +417,8 @@ class Enemy {
                 this.mesh.lookAt(targetPos.x, this.mesh.position.y, targetPos.z);
             }
 
-            // Animation Attack - use new system
-            this.playAnim('Attack');
+            // Animation Attack - use stored name or fallback
+            if (this.attackAnimName) this.playAnim(this.attackAnimName);
         }
 
         // Flash timer reset
@@ -498,6 +505,9 @@ class Enemy {
         }
         this.animActions = null;
         this.attackClipAction = null;
+        this.attackAnimName = null;
+        this.deathClipAction = null;
+        this.deathAnimName = null;
 
         // Legacy animController fallback
         if (this.animController) this.animController.dispose();
