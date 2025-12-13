@@ -1,51 +1,61 @@
 
 class Game {
     constructor() {
+		this.modManager = new ModManager(this); // Init System
+		this.setupDragAndDrop(); // 2. Setup Drag & Drop
+		
+		this.raidManager = new RaidManager(this);
+		this.dialogueSystem = new DialogueSystem(this);
         this.entities = [];
+		this.structures = [];
+		this.floatingTexts = [];
+		this.sound = new SoundSystem();
         this.clock = new THREE.Clock();
         this.debug = document.getElementById('debug');
         
         this.runTime = 0; this.kills = 0; this.isGameOver = false; this.inOutpost = true; this.runAffinity = null;
-        this.currentBiome = 'rift_wastes'; this.zoneKills = 0; this.zoneTime = 0; this.zonesCleared = 0; this.portal = null; this.portalSpawned = false;
+        this.currentBiome = 'rift_wastes';
         
         this.screenShakeTimer = 0; this.screenShakeIntensity = 0; this.particles = [];
-        
         this.pendingBiome = null;
+        
+        // Compass State
+        this.compassTargetIndex = 0;
         
         MetaProgression.load();
         
+        if (window.WorldState) WorldState.generate();
+        
         this.initUI();
+        this.hud = new HUDSystem(this);
         this.initRenderer();
         this.initScene();
         this.initCamera();
         this.initLights();
-        
-        // Raycaster for Mouse Aiming
         this.raycaster = new THREE.Raycaster();
         this.mousePlane = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0);
         
-        // FORCE WORLD MANAGER
         if (typeof WorldManager === 'function') {
             this.world = new WorldManager(this);
         } else if (window.WorldManager) {
              this.world = new window.WorldManager(this);
-        } else {
-            console.error("WorldManager is missing!");
         }
         
         this.input = new Input();
         
-        this.showOutpost();
+        this.loadHub();
         window.addEventListener('resize', () => this.onResize());
+		
+		this.modManager.trigger('gameStart', this); // Let mods know we are liv
+		
         this.loop();
+		
     }
     
-    // NEW: Get 3D position of mouse on ground level
     getMouseWorldPosition() {
         const mouse = new THREE.Vector2();
         mouse.x = (this.input.mouse.x / window.innerWidth) * 2 - 1;
         mouse.y = -(this.input.mouse.y / window.innerHeight) * 2 + 1;
-        
         this.raycaster.setFromCamera(mouse, this.camera);
         const target = new THREE.Vector3();
         this.raycaster.ray.intersectPlane(this.mousePlane, target);
@@ -53,35 +63,39 @@ class Game {
     }
     
     initUI() {
-        this.statTimeEl = document.getElementById('stat-time');
-        this.statKillsEl = document.getElementById('stat-kills');
-        this.statEssenceEl = document.getElementById('stat-essence');
+        // Menu screens (kept as HTML)
         this.gameOverEl = document.getElementById('game-over');
         this.finalTimeEl = document.getElementById('final-time');
         this.finalKillsEl = document.getElementById('final-kills');
         this.essenceEarnedEl = document.getElementById('essence-earned');
-        
-        document.getElementById('restart-btn').addEventListener('click', () => this.quickRestart());
-        document.getElementById('outpost-btn').addEventListener('click', () => this.showOutpost());
-        document.getElementById('enter-rift-btn').addEventListener('click', () => this.enterRift());
-        document.getElementById('reset-progress-btn').addEventListener('click', () => { if(confirm('Reset?')) { MetaProgression.reset(); this.showOutpost(); }});
-        
-        this.dashBarFill = document.getElementById('dash-bar-fill');
-        this.dashLabel = document.getElementById('dash-label');
-        this.dashBar = document.getElementById('dash-bar');
-        this.slamBarFill = document.getElementById('slam-bar-fill');
-        this.slamLabel = document.getElementById('slam-label');
-        this.slamBar = document.getElementById('slam-bar');
         this.outpostEl = document.getElementById('outpost');
         this.upgradesGridEl = document.getElementById('upgrades-grid');
+        
+        // Menu button handlers
+        document.getElementById('outpost-btn').addEventListener('click', () => this.loadHub());
+        document.getElementById('enter-rift-btn').addEventListener('click', () => this.enterRift());
+        
+        // Debug element removed - now in HUD
+        this.debug = { textContent: '' }; // Stub for backwards compat
     }
 
     initRenderer() {
-        this.renderer = new THREE.WebGLRenderer({ antialias: true });
-        this.renderer.setSize(window.innerWidth, window.innerHeight);
-        this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
-        this.renderer.setClearColor(0x1a1a2e);
-        document.body.appendChild(this.renderer.domElement);
+        this.renderer = new THREE.WebGLRenderer({ 
+			antialias: false, // PSX didn't have AA
+			powerPreference: "high-performance"
+		});
+
+		// PSX Resolution (roughly)
+		// We render at 320x224, then CSS stretches it to 1080p/4K
+		this.internalWidth = 800;
+		this.internalHeight = 600;
+
+		this.renderer.setSize(this.internalWidth, this.internalHeight, false); // false = don't resize canvas style
+		this.renderer.setPixelRatio(1); // Force 1:1 pixel ratio
+		this.renderer.setClearColor(0x1a1a2e);
+
+		// Darken the page background to match
+		document.body.appendChild(this.renderer.domElement);
     }
     
     initScene() {
@@ -107,23 +121,23 @@ class Game {
         this.scene.add(this.player.mesh);
         this.enemies = []; this.projectiles = []; this.pickups = [];
         this.spawnTimer = 0; this.spawnInterval = 3000; this.maxEnemies = 10; this.runEssence = 0;
-        for (let i = 0; i < 3; i++) this.spawnEnemy('default');
     }
     
     spawnEnemy(forceType = null) {
-        if (this.enemies.length >= this.maxEnemies) return;
+if (this.enemies.length >= this.maxEnemies) return;
         
         let x, z, attempts = 0;
         let valid = false;
         
-        while (!valid && attempts < 10) {
+        while (!valid && attempts < 50) {
             const angle = Math.random() * Math.PI * 2;
-            const dist = 10 + Math.random() * 5;
+            const dist = 10 + Math.random() * 8;
             x = this.player.mesh.position.x + Math.cos(angle) * dist;
             z = this.player.mesh.position.z + Math.sin(angle) * dist;
             
             if (this.world) {
-                if (!this.world.checkCollision(x, z, 0.6)) {
+                // Check if position is clear (0.4 radius for enemies)
+                if (!this.world.checkCollision(x, z, 0.4)) {
                     valid = true;
                 }
             } else {
@@ -132,7 +146,11 @@ class Game {
             attempts++;
         }
         
-        if (!valid) return;
+        if (!valid) {
+            // DEBUG LOG: If this prints, the Grid is clogged.
+            console.warn("Spawn failed: No valid space found after 50 attempts.");
+            return; 
+        }
         
         let type = forceType;
         if (!type) {
@@ -153,35 +171,31 @@ class Game {
     }
     
     addKill() {
-        this.kills++; this.zoneKills++; this.statKillsEl.textContent = this.kills;
-        this.checkPortal();
-    }
-    
-    checkPortal() {
-        const t = BiomeRegistry.get(this.currentBiome).portalThreshold;
-        if (!this.portal && !this.portalSpawned && (this.zoneKills >= t.kills || this.zoneTime >= t.time)) {
-             let px, pz, attempts = 0;
-             do { 
-                 const angle = Math.random() * Math.PI * 2;
-                 const dist = 6 + Math.random() * 4;
-                 px = this.player.mesh.position.x + Math.cos(angle) * dist;
-                 pz = this.player.mesh.position.z + Math.sin(angle) * dist;
-                 attempts++; 
-             } while (attempts < 20 && this.world && this.world.checkCollision(px, pz, 1.5));
-             
-             this.portal = new Portal(this, px, pz, BiomeRegistry.getRandomBiome(this.currentBiome));
-             this.entities.push(this.portal); this.scene.add(this.portal.mesh); this.portalSpawned = true;
-        }
+        this.kills++; 
+        this.hud.updateStats(this.formatTime(this.runTime), this.kills, this.runEssence);
     }
     
     transitionToBiome(biomeId) {
         this.pendingBiome = biomeId;
     }
 
-    executeBiomeTransition(biomeId) {
-        this.cleanupEntities();
-        this.currentBiome = biomeId; this.zonesCleared++; this.zoneKills = 0; this.zoneTime = 0; this.portalSpawned = false;
-        const biome = BiomeRegistry.get(biomeId);
+    executeBiomeTransition(targetNodeId) {
+		if (targetNodeId === 'NEW_RUN') {
+            this.enterRift();
+            return;
+        }
+		
+        if (!window.WorldState) return;
+        
+        WorldState.currentNodeId = targetNodeId;
+        const node = WorldState.getCurrentNode();
+        
+        console.log(`Transitioning to ${node.name} (${node.biomeId})`);
+        
+        this.currentBiome = node.biomeId;
+        this.cleanupEntities(); // This pushes player to entities list
+        
+        const biome = BiomeRegistry.get(this.currentBiome);
         this.scene.fog.color.setHex(biome.fogColor); this.scene.fog.density = biome.fogDensity;
         this.ambientLight.color.setHex(biome.ambientColor);
         this.scene.background.setHex(biome.fogColor);
@@ -189,7 +203,9 @@ class Game {
         if (this.world) this.world.clear();
         
         this.player.mesh.position.set(0, 0.5, 0);
-        this.entities.push(this.player); this.scene.add(this.player.mesh);
+        // FIX: Removed duplicate player push
+        // this.entities.push(this.player); 
+        
         if(this.player.dashTrail) this.scene.add(this.player.dashTrail);
         if(this.player.slamRing) this.scene.add(this.player.slamRing);
         
@@ -211,26 +227,26 @@ class Game {
         if (entIdx > -1) this.entities.splice(entIdx, 1);
     }
 
-    cleanupEntities() {
-        if(this.enemies) [...this.enemies].forEach(e => this.safeRemove(e, this.enemies));
-        if(this.projectiles) [...this.projectiles].forEach(p => this.safeRemove(p, this.projectiles));
-        if(this.pickups) [...this.pickups].forEach(p => this.safeRemove(p, this.pickups));
-        if(this.portal) { this.safeRemove(this.portal, null); this.portal = null; }
-        
-        if(this.player) { 
-            this.scene.remove(this.player.mesh); 
-            if(this.player.dashTrail) this.scene.remove(this.player.dashTrail); 
-            if(this.player.slamRing) this.scene.remove(this.player.slamRing); 
-        }
-        
-        this.particles.forEach(p => { 
-            this.scene.remove(p.mesh); 
-            p.mesh.geometry.dispose(); 
-            p.mesh.material.dispose(); 
-        });
-        this.particles = []; 
-        this.entities = [];
-    }
+	cleanupEntities(forceClearPlayer = false) {
+		[...this.entities].forEach(e => {
+			// FIX: If forceClearPlayer is true, delete EVERYONE.
+			if (!forceClearPlayer && e === this.player) return;
+			this.safeRemove(e, null);
+		});
+
+		this.enemies = [];
+		this.projectiles = [];
+		this.pickups = [];
+		this.particles.forEach(p => { 
+			this.scene.remove(p.mesh); p.mesh.geometry.dispose(); p.mesh.material.dispose(); 
+		});
+		this.particles = [];
+
+		this.entities = [];
+		this.structures = [];
+		// Only keep player in the list if we didn't force clear
+		if (!forceClearPlayer && this.player) this.entities.push(this.player);
+	}
     
     triggerGameOver() {
         if (this.isGameOver) return;
@@ -242,49 +258,124 @@ class Game {
         this.gameOverEl.classList.add('visible');
     }
     
-    showOutpost() {
-        this.inOutpost = true; this.gameOverEl.classList.remove('visible'); this.outpostEl.classList.remove('hidden');
-        document.getElementById('total-runs').textContent = MetaProgression.data.runs;
-        document.getElementById('best-time').textContent = this.formatTime(MetaProgression.data.bestTime);
-        document.getElementById('best-kills').textContent = MetaProgression.data.bestKills;
-        document.getElementById('current-essence').textContent = MetaProgression.data.essence;
-        document.getElementById('magic-affinity').textContent = MetaProgression.data.magicAffinity;
-        document.getElementById('tech-affinity').textContent = MetaProgression.data.techAffinity;
-        this.upgradesGridEl.innerHTML = '';
-        UpgradeRegistry.list().forEach(u => {
-            const owned = MetaProgression.hasUpgrade(u.id);
-            const locked = u.requires && !MetaProgression.hasUpgrade(u.requires);
-            const card = document.createElement('div');
-            card.className = `upgrade-card ${owned?'owned':''} ${locked?'locked':''}`;
-            const tag = u.affinity !== 'neutral' ? `<span class="affinity-tag ${u.affinity}">${u.affinity}</span>` : '';
-            card.innerHTML = `<div class="name">${u.name}${tag}</div><div class="desc">${u.description}</div><div class="cost">${owned ? 'Owned' : '◆ '+u.cost}</div>`;
-            if(!owned && !locked) card.onclick = () => { if(MetaProgression.buyUpgrade(u)) this.showOutpost(); };
-            this.upgradesGridEl.appendChild(card);
-        });
-    }
-    
-    enterRift() {
-        this.inOutpost = false; this.outpostEl.classList.add('hidden');
-        this.runAffinity = MetaProgression.data.runs % 2 === 0 ? 'magic' : 'tech';
-        this.cleanupEntities();
-        this.runTime = 0; this.kills = 0; this.runEssence = 0; this.isGameOver = false;
-        this.spawnTimer = 0; this.spawnInterval = 3000; this.currentBiome = 'rift_wastes';
-        this.zoneKills = 0; this.zoneTime = 0; this.zonesCleared = 0; this.portalSpawned = false;
-        this.statTimeEl.textContent = '0:00'; this.statKillsEl.textContent = '0'; this.statEssenceEl.textContent = '0';
+	loadHub() {
+		this.gameOverEl.classList.remove('visible');
+		
+        this.inOutpost = true; // Flag for logic checks
+        this.currentBiome = 'sanctuary';
+		
+		if (window.WorldState) {
+            WorldState.currentNodeId = 'outpost_0'; 
+        }
+		
+		if (this.raidManager) this.raidManager.reset();
+		this.hud.updateStats('--:--', '-', MetaProgression.data.essence);
+        this.hud.setVisible(true); // Show banked essence
+		
+        this.cleanupEntities(true);
+		
         
-        const biome = BiomeRegistry.get('rift_wastes');
-        this.scene.fog.color.setHex(biome.fogColor); this.scene.fog.density = biome.fogDensity;
+        // 1. Reset Environment
+        const biome = BiomeRegistry.get('sanctuary');
+        this.scene.fog.color.setHex(biome.fogColor); 
+        this.scene.fog.density = biome.fogDensity;
         this.ambientLight.color.setHex(biome.ambientColor); 
         this.scene.background.setHex(biome.fogColor);
         
-        // Clear world
         if (this.world) this.world.clear();
+		
+		HubState.load(this);
         
+        // 2. Spawn Player
         this.initPlayer();
-        this.clock.getDelta();
+        this.player.mesh.position.set(0, 0.5, 3.0);
+        
+		// 3. Spawn NPCs (CONDITIONALLY)
+		const unlocked = MetaProgression.data.unlockedCharacters;
+
+		// Blacksmith (Garrick) - Requires 'smith' unlock
+		if (unlocked.includes('smith')) {
+			const smith = new NPC(this, 5, 5, "Garrick", "smith", 0x884444);
+			this.entities.push(smith); this.scene.add(smith.mesh);
+		}
+		
+		// Scribe (Elara) - Requires 'scribe' unlock
+		if (unlocked.includes('scribe')) {
+			const scribe = new NPC(this, -5, 5, "Elara", "scribe", 0x444488);
+			this.entities.push(scribe); this.scene.add(scribe.mesh);
+		}
+		
+		// Architect (Kael) - Requires 'builder' unlock
+        if (unlocked.includes('builder')) {
+            // Position him opposite the Forgotten (0, 8)
+            const builder = new NPC(this, 0, 8, "Kael", "builder", 0xffaa00);
+            this.entities.push(builder); this.scene.add(builder.mesh);
+        }
+		
+		// The Forgotten (Always there)
+		const resetNPC = new NPC(this, 0, -8, "The Forgotten", "reset", 0x333333);
+		this.entities.push(resetNPC); this.scene.add(resetNPC.mesh);
+		
+        // 4. Create a "Rift Gate" (Portal to start run)
+        // Instead of a button, we now have a physical object to walk into
+        /*const riftGate = new Portal(this, 0, 10, 'NEW_RUN', 'ENTER THE RIFT');
+        this.entities.push(riftGate); this.scene.add(riftGate.mesh);*/
+		this.riftGate = new RiftGate(this, 0, 0); // Center of hub
+        this.entities.push(this.riftGate); 
+        this.scene.add(this.riftGate.mesh);
     }
     
-    quickRestart() { this.gameOverEl.classList.remove('visible'); this.enterRift(); }
+    enterRift() {
+		// 1. SAVE THE HUB
+        if (this.currentBiome === 'sanctuary') {
+            HubState.save(this.entities);
+        }
+		
+        this.inOutpost = false; this.outpostEl.classList.add('hidden');
+        this.runAffinity = MetaProgression.data.runs % 2 === 0 ? 'magic' : 'tech';
+        
+		if (window.WorldState) {
+            WorldState.generate(); 
+            WorldState.currentNodeId = 'outpost_0';
+            const node = WorldState.getCurrentNode();
+            this.currentBiome = node.biomeId;
+        } else {
+            this.currentBiome = 'rift_wastes';
+        }
+        
+        // FIX: Force nuke the old player and entities
+        this.cleanupEntities(true);
+        
+        // FIX: Reset Game Over state explicitly
+        this.isGameOver = false;
+        
+        // FIX: Hard reset the World Grid
+        if (this.world) {
+            this.world.clear();
+            // Double-tap the grid just to be sure
+            if (this.world.spatialGrid) this.world.spatialGrid.clear();
+        }
+        
+        this.initPlayer(); // This resets maxEnemies to 10 and spawnTimer to 0
+        this.runTime = 0; 
+        this.kills = 0; 
+        this.runEssence = 0;
+        
+        // Update HUD
+        this.hud.updateStats('0:00', 0, 0);
+        this.hud.setVisible(true);
+        
+        // Visuals
+        const biome = BiomeRegistry.get(this.currentBiome);
+        this.scene.fog.color.setHex(biome.fogColor); 
+        this.scene.fog.density = biome.fogDensity;
+        this.ambientLight.color.setHex(biome.ambientColor); 
+        this.scene.background.setHex(biome.fogColor);
+        
+        this.clock.getDelta();
+        
+        console.log("--- RIFT ENTERED (Grid Cleared) ---");
+    }
     
     screenShake(d, i) { this.screenShakeTimer = d; this.screenShakeIntensity = i; }
     
@@ -306,12 +397,91 @@ class Game {
         }
     }
     
+    updateCompass() {
+        if (!this.player || !this.world || !window.WorldManager) return;
+        
+        let targets = [];
+
+        // FIX: Context-sensitive targets
+        if (this.currentBiome === 'sanctuary') {
+            // Hub Targets
+            targets = [{ x: 0, z: 0, name: "RIFT GATE" }];
+            
+            const unlocked = MetaProgression.data.unlockedCharacters;
+            
+            if (unlocked.includes('smith')) targets.push({ x: 5, z: 5, name: "Garrick (Smith)" });
+            if (unlocked.includes('scribe')) targets.push({ x: -5, z: 5, name: "Elara (Scribe)" });
+			if (unlocked.includes('builder')) targets.push({ x: 0, z: 8, name: "Kael (Architect)" });
+            
+            // Optional: Point to reset NPC if you want
+            // targets.push({ x: 0, z: -8, name: "The Forgotten" });
+        } else {
+            // 1. Realm Portals
+            const portals = this.world.getRealmPortals();
+            targets = [...portals];
+            
+            // 2. FIX: ADD CAGES (Rescue Signals)
+            // Scan active entities for Cages. 
+            // We use 'e.constructor.name' to be safe, or 'instanceof Cage' if global.
+            const cages = this.entities.filter(e => e.constructor.name === 'Cage' && !e.dead);
+            
+            cages.forEach(c => {
+                targets.push({
+                    x: c.mesh.position.x,
+                    z: c.mesh.position.z,
+                    name: `SOS: ${c.def.name.toUpperCase()}` // e.g. "SOS: IRONCLAD"
+                });
+            });
+
+            // 3. Return Point
+            targets.push({ x: 0, z: 0, name: "Outpost (Return)" });
+        }
+        
+        if (this.input.wasPressed('KeyC')) {
+            this.compassTargetIndex = (this.compassTargetIndex + 1) % targets.length;
+        }
+        
+        if (this.compassTargetIndex >= targets.length) this.compassTargetIndex = 0;
+        
+        const target = targets[this.compassTargetIndex];
+        const px = this.player.mesh.position.x;
+        const pz = this.player.mesh.position.z;
+        
+        const dx = target.x - px;
+        const dz = target.z - pz;
+        const dist = Math.sqrt(dx*dx + dz*dz);
+        const angle = Math.atan2(dz, dx) * (180 / Math.PI);
+        
+        const isReturn = target.name === "Outpost (Center)" || target.name === "Outpost (Return)";
+        this.hud.updateCompass(angle, target.name, dist, isReturn);
+    }
+    
     formatTime(s) { return `${Math.floor(s/60)}:${Math.floor(s%60).toString().padStart(2,'0')}`; }
-    onResize() { this.camera.aspect = window.innerWidth/window.innerHeight; this.camera.updateProjectionMatrix(); this.renderer.setSize(window.innerWidth, window.innerHeight); }
+	onResize() { 
+		// We don't change internal resolution on resize, only the aspect ratio
+		this.camera.aspect = window.innerWidth / window.innerHeight; 
+		this.camera.updateProjectionMatrix(); 
+		// Renderer size stays constant 320x224
+	}
+	
+	spawnFloatingText(x, z, text, color) {
+		this.floatingTexts.push(new FloatingText(this, x, z, text, color));
+	}
     
     loop() {
         requestAnimationFrame(() => this.loop());
+		
         const dt = this.clock.getDelta(); const elapsed = this.clock.getElapsedTime();
+		if (this.modManager) this.modManager.trigger('update', dt); // Allow mods to run logic every frame
+		
+		if (this.raidManager) this.raidManager.update(dt);
+		
+		if (this.currentBoss && !this.currentBoss.dead) {
+            this.hud.updateBoss(true, this.currentBoss.def.name, this.currentBoss.health.active, this.currentBoss.health.maxActive);
+        } else {
+            this.hud.updateBoss(false);
+            this.currentBoss = null;
+        }
         
         if (window.ModelLoader) ModelLoader.update(dt);
         
@@ -320,29 +490,48 @@ class Game {
             this.pendingBiome = null;
             return;
         }
+		
+		if (this.world && this.player && !this.player.dead) {
+			this.world.update(this.player.mesh.position.x, this.player.mesh.position.z);
+			this.updateCompass();
+			
+			// NEW: Update Pathfinding every 200ms (5fps)
+			// This keeps it cheap but responsive enough
+			const now = Date.now();
+			if (now - this.world.lastFlowUpdate > 200) {
+				this.world.updateFlowField(this.player.mesh.position.x, this.player.mesh.position.z);
+				this.world.lastFlowUpdate = now;
+			}
+		}
         
-        if (this.world && this.player && !this.player.dead) {
-            this.world.update(this.player.mesh.position.x, this.player.mesh.position.z);
-        }
-
-        if (this.inOutpost || !this.player) { this.renderer.render(this.scene, this.camera); return; }
-        
-        [...this.entities].forEach(e => { if(e.update) e.update(dt, elapsed); });
+        [...this.entities].forEach(e => { if(e && e.update) e.update(dt, elapsed); });
         
         for(let i=this.enemies.length-1; i>=0; i--) if(this.enemies[i].shouldRemove) this.safeRemove(this.enemies[i], this.enemies);
         for(let i=this.projectiles.length-1; i>=0; i--) if(this.projectiles[i].shouldRemove) this.safeRemove(this.projectiles[i], this.projectiles);
         for(let i=this.pickups.length-1; i>=0; i--) if(this.pickups[i].shouldRemove) this.safeRemove(this.pickups[i], this.pickups);
         if(this.portal && this.portal.shouldRemove) { this.safeRemove(this.portal, null); this.portal = null; }
         
-        if(!this.player.dead && !this.isGameOver) {
-            this.runTime += dt; this.zoneTime += dt; this.statTimeEl.textContent = this.formatTime(this.runTime);
-            this.checkPortal();
-            const biome = BiomeRegistry.get(this.currentBiome);
-            this.spawnTimer += dt * 1000 * biome.spawnRateMultiplier;
-            if(this.spawnTimer >= this.spawnInterval) {
-                this.spawnTimer = 0; this.spawnEnemy();
-                this.spawnInterval = Math.max(800, this.spawnInterval - 30);
-                this.maxEnemies = Math.min(15, 10 + Math.floor(this.runTime / 30));
+		if(!this.player.dead && !this.isGameOver) {
+            this.runTime += dt; 
+            
+            // FIX: Context-sensitive HUD updates
+            if (this.currentBiome === 'sanctuary') {
+                // In Hub: Show "Banked" Essence
+                this.hud.updateStats('--:--', '-', MetaProgression.data.essence);
+            } else {
+                // In Rift: Show "Run" Essence (Score)
+                this.hud.updateStats(this.formatTime(this.runTime), this.kills, this.runEssence);
+                
+                // Spawn Logic (Only in Rift)
+                const biome = BiomeRegistry.get(this.currentBiome);
+                if (biome.spawnRateMultiplier > 0) {
+                     this.spawnTimer += dt * 1000 * biome.spawnRateMultiplier;
+                     if(this.spawnTimer >= this.spawnInterval) {
+                         this.spawnTimer = 0; this.spawnEnemy();
+						 this.spawnInterval = Math.max(800, this.spawnInterval - 30);
+						 this.maxEnemies = Math.min(50, 10 + Math.floor(this.runTime / 30));
+                     }
+                }
             }
         }
         
@@ -356,22 +545,93 @@ class Game {
             this.camera.position.x += (Math.random()-0.5)*amt*0.1;
             this.camera.position.y += (Math.random()-0.5)*amt*0.05;
         }
-        
-        const dashR = this.player.getAbilityCooldownRatio('dash');
-        this.dashBarFill.style.width = ((1-dashR)*100)+'%';
-        this.dashBar.className = dashR>0 ? 'cooldown' : '';
-        this.dashLabel.textContent = dashR>0 ? 'DASH' : 'DASH READY';
-        this.dashLabel.className = dashR>0 ? '' : 'ready';
-        
-        const slamR = this.player.getAbilityCooldownRatio('slam');
-        this.slamBarFill.style.width = ((1-slamR)*100)+'%';
-        this.slamBar.className = slamR>0 ? 'cooldown' : '';
-        this.slamLabel.textContent = slamR>0 ? 'SLAM' : 'SLAM READY';
-        this.slamLabel.className = slamR>0 ? '' : 'ready';
+		
+		this.floatingTexts = this.floatingTexts.filter(t => t.update(dt));
 
         const buffList = Object.keys(this.player.buffs).map(b => `${b}:${this.player.buffs[b].remaining.toFixed(1)}s`).join(' ');
-        this.debug.textContent = `RiftScape Infinite v1.6\n${BiomeRegistry.get(this.currentBiome).name}\nEntities: ${this.entities.length}\nFPS: ${(1/dt).toFixed(0)} ${buffList}`;
+        
+        let nodeInfo = "";
+        if (window.WorldState) {
+            const node = WorldState.getCurrentNode();
+            const pX = this.player.mesh.position.x;
+            const pZ = this.player.mesh.position.z;
+            const dist = Math.sqrt(pX*pX + pZ*pZ).toFixed(0);
+            nodeInfo = ` | ${node.name} [Depth: ${dist}m] Lvl:${node.level}`;
+        }
+        
+        this.hud.updateDebug(`RiftScape v3.0 CANVAS HUD\n${BiomeRegistry.get(this.currentBiome).name}\nEntities: ${this.entities.length}\nFPS: ${(1/dt).toFixed(0)} ${buffList} ${nodeInfo}`);
         
         this.renderer.render(this.scene, this.camera);
+        if (this.hud) this.hud.render(this.renderer);
+		
+		this.input.clear();
+    }
+	
+	setupDragAndDrop() {
+        const dropZone = document.body;
+
+        // 1. Visual Feedback during Drag
+        dropZone.addEventListener('dragover', (e) => {
+            e.preventDefault(); // Necessary to allow dropping
+            if (this.currentBiome === 'sanctuary') {
+                dropZone.style.boxShadow = "inset 0 0 50px #00ff00"; // Green glow
+                dropZone.style.cursor = "copy";
+            } else {
+                dropZone.style.boxShadow = "inset 0 0 50px #ff0000"; // Red glow (Deny)
+                dropZone.style.cursor = "not-allowed";
+            }
+        });
+
+        dropZone.addEventListener('dragleave', (e) => {
+            dropZone.style.boxShadow = "none";
+            dropZone.style.cursor = "default";
+        });
+
+        // 2. The Drop Logic
+        dropZone.addEventListener('drop', (e) => {
+            e.preventDefault();
+            dropZone.style.boxShadow = "none";
+
+            // RULE: Only mod in the Outpost (Sanctuary)
+            if (this.currentBiome !== 'sanctuary') {
+                this.hud.updateDebug("SECURITY PROTOCOL: MODDING DISABLED IN RIFT");
+                this.sound.play('error');
+                return;
+            }
+
+            const files = e.dataTransfer.files;
+            if (files.length > 0) {
+                this.handleModFile(files[0]);
+            }
+        });
+    }
+
+    handleModFile(file) {
+        if (!file.name.endsWith('.js')) {
+            this.hud.updateDebug("INVALID FORMAT. REQUIRE .JS");
+            this.sound.play('error');
+            return;
+        }
+
+        const reader = new FileReader();
+        reader.onload = (e) => {
+            const code = e.target.result;
+            
+            // PUNK ROCK INJECTION: Create a script tag with the content
+            // This executes immediately in the global scope.
+            try {
+                const script = document.createElement('script');
+                script.textContent = code;
+                document.body.appendChild(script);
+                
+                // Note: The script itself should call game.modManager.register()
+                // If it doesn't, it still runs, just silently.
+            } catch (err) {
+                console.error("Mod Execution Error:", err);
+                this.hud.updateDebug("MOD EXECUTION FAILURE");
+                this.sound.play('error');
+            }
+        };
+        reader.readAsText(file);
     }
 }

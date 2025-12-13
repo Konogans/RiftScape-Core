@@ -25,3 +25,13 @@ BiomeRegistry.register('void_cathedral', {
     name: 'Void Cathedral', groundColor: 0x1a1a30, fogColor: 0x080818, fogDensity: 0.05, ambientColor: 0x303050,
     enemyWeights: { default: 0.2, swift: 0.2, brute: 0.2, spitter: 0.4 }, spawnRateMultiplier: 0.7, portalThreshold: { kills: 10, time: 50 }
 });
+BiomeRegistry.register('sanctuary', {
+    name: 'The Outpost',
+    groundColor: 0x224422, // Grass-ish
+    fogColor: 0x88ccff,    // Blue sky
+    fogDensity: 0.005,     // Very clear view
+    ambientColor: 0x8888aa, // Bright ambient light
+    enemyWeights: {},       // No enemies
+    spawnRateMultiplier: 0, // 0 means peaceful
+    portalThreshold: { kills: 0, time: 0 } // Portals always open (or handled manually)
+});

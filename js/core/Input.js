@@ -46,18 +46,21 @@ class Input {
     isMouseHeld(button) { return !!this.mouse.buttons[button]; }
     
     wasPressed(code) {
-        if (this.keysPressed[code]) { this.keysPressed[code] = false; return true; }
-        return false;
+        return !!this.keysPressed[code];
     }
     
     wasMousePressed(button) {
-        if (this.mouseButtonsPressed[button]) { this.mouseButtonsPressed[button] = false; return true; }
-        return false;
+        return !!this.mouseButtonsPressed[button];
     }
     
     wasReleased(code) {
-        if (this.keysReleased[code]) { this.keysReleased[code] = false; return true; }
-        return false;
+        return !!this.keysReleased[code];
+    }
+	
+	clear() {
+        this.keysPressed = {};
+        this.keysReleased = {};
+        this.mouseButtonsPressed = {};
     }
     
     getMovementVector() {

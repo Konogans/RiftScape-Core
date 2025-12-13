@@ -1,62 +1,217 @@
-
 class Player {
     constructor(game) {
         this.game = game;
-        this.mods = MetaProgression.getStatMods();
-        this.baseSpeed = 5;
-        this.speed = this.baseSpeed * (1 + this.mods.moveSpeed);
-        this.baseAttackDamage = 1 + this.mods.attackDamage;
-        this.attackDamage = this.baseAttackDamage;
-        this.buffs = {};
-        this.abilityCooldowns = { dash: 0, slam: 0 };
-        this.isDashing = false; this.dashTimer = 0; this.dashDirection = { x: 0, z: 0 };
-        this.isInvulnerable = false;
-        this.isSlamming = false; this.slamTimer = 0; this.slamHit = false;
         
+        // 1. SETUP STATS
+        const charId = MetaProgression.data.currentCharacter || 'wanderer';
+        this.charDef = CharacterRegistry.get(charId);
+        this.mods = MetaProgression.getStatMods();
+        
+        this.baseSpeed = 4.0;
+        this.speed = this.baseSpeed * (1 + this.mods.moveSpeed + (this.charDef.stats.moveSpeed||0));
+        this.baseAttackDamage = 1 + this.mods.attackDamage + (this.charDef.stats.attackDamage||0);
+        this.attackDamage = this.baseAttackDamage;
+        
+        // 2. STATE
+        this.buffs = {};
+        this.isInvulnerable = false;
+        this.velocityOverride = null; // For dashes/knockbacks
+        
+        // 3. MESH & HEALTH
         this.initMesh();
         this.initHealth();
-        this.initAttack();
-        this.initAbilities();
+        
+        // 4. THE PEDALBOARD (Loadout)
+        this.actions = {};
+        this.initLoadout();
+        
+        // 5. ABILITY VISUALS (Trails, Rings)
+        this.initVisuals();
+        
+        // 6. UI
         this.initUI();
+    }
+    
+	initLoadout() {
+        const loadoutDef = this.charDef.loadout || {};
+        const slots = ['primary', 'secondary', 'mobility', 'utility', 'mastery'];
+        
+        slots.forEach(slot => {
+            const abilityId = loadoutDef[slot];
+            if (!abilityId) return;
+            
+            const def = AbilityRegistry.get(abilityId);
+            if (!def) return;
+            
+            const speedMod = (this.mods.attackSpeed||0) + (this.charDef.stats.attackSpeed||0);
+            const speedMult = 1 / (1 + speedMod);
+            
+            this.actions[slot] = new Action({
+                windupTime: def.timing.windup * speedMult,
+                actionTime: def.timing.action * speedMult,
+                cooldownTime: def.timing.cooldown * speedMult,
+                
+                onWindup: () => def.onWindup && def.onWindup(this, this.game),
+                onAction: () => def.onAction && def.onAction(this, this.game),
+                onFinish: () => def.onFinish && def.onFinish(this, this.game),
+                // FIX: Pass the onUpdate handler so animations work!
+                onUpdate: (action) => def.onUpdate && def.onUpdate(this, this.game, action)
+            });
+            this.actions[slot].def = def; 
+        });
     }
     
     initMesh() {
         const geometry = new THREE.BoxGeometry(0.6, 1, 0.6);
-        this.baseMaterial = new THREE.MeshStandardMaterial({ color: 0x44aaff, roughness: 0.4, metalness: 0.6, emissive: 0x112244, emissiveIntensity: 0.3 });
+        this.baseMaterial = PSXify(new THREE.MeshStandardMaterial({ color: this.charDef.color || 0x44aaff, roughness: 0.4, metalness: 0.6, emissive: 0x112244, emissiveIntensity: 0.3 }));
         this.mesh = new THREE.Mesh(geometry, this.baseMaterial);
         this.mesh.position.y = 0.5;
         this.mesh.castShadow = true;
         
         const indicatorGeom = new THREE.ConeGeometry(0.15, 0.3, 8);
-        const indicatorMat = new THREE.MeshStandardMaterial({ color: 0xffaa44, emissive: 0xffaa44, emissiveIntensity: 0.5 });
+        const indicatorMat = PSXify(new THREE.MeshStandardMaterial({ color: 0xffaa44, emissive: 0xffaa44, emissiveIntensity: 0.5 }));
         this.indicator = new THREE.Mesh(indicatorGeom, indicatorMat);
         this.indicator.rotation.x = Math.PI / 2;
         this.indicator.position.z = -0.4;
         this.mesh.add(this.indicator);
         
         const attackGeom = new THREE.BoxGeometry(0.8, 0.1, 1.2);
-        const attackMat = new THREE.MeshStandardMaterial({ color: 0xffaa44, emissive: 0xffaa44, emissiveIntensity: 1, transparent: true, opacity: 0 });
+        const attackMat = PSXify(new THREE.MeshStandardMaterial({ color: 0xffaa44, emissive: 0xffaa44, emissiveIntensity: 1, transparent: true, opacity: 0 }));
         this.attackMesh = new THREE.Mesh(attackGeom, attackMat);
         this.attackMesh.position.z = -0.8;
         this.mesh.add(this.attackMesh);
     }
     
-    initHealth() {
-        const baseActive = 5 + this.mods.maxHealth;
-        const baseReserve = 10 + this.mods.maxReserve;
-        const baseRegen = 0.5 + this.mods.regenRate;
-        this.health = new PointPool({ active: baseActive, reserve: baseReserve, regen: baseRegen, onChanged: () => this.updateHealthUI(), onReachZero: () => this.onDeath() });
+	initHealth() {
+        const baseActive = 5 + this.mods.maxHealth + this.charDef.stats.maxHealth;
+        const baseReserve = 10 + this.mods.maxReserve + this.charDef.stats.maxReserve;
+        
+        // NERF: Reduced base regen from 0.5 to 0.1 (5x slower)
+        const baseRegen = 0.1 + this.mods.regenRate; 
+        
+        this.health = new PointPool({ 
+            active: baseActive, 
+            reserve: baseReserve, 
+            regen: baseRegen, // This now only affects Active pool
+            reserveRegen: 0,  // Explicitly 0. Reserve requires pickups.
+            onChanged: () => this.updateHealthUI(), 
+            onReachZero: () => this.onDeath() 
+        });
     }
-    
-    initAttack() {
+	
+	initVisuals() {
+        // DASH TRAIL
+        // Save the MATERIAL to 'this.dashTrailMaterial' so the Registry can fade it
+        this.dashTrailMaterial = new THREE.MeshBasicMaterial({ color: 0x44aaff, transparent: true, opacity: 0 });
+        this.dashTrail = new THREE.Mesh(new THREE.BoxGeometry(0.6, 1, 0.6), this.dashTrailMaterial);
+        this.dashTrail.visible = false;
+        this.game.scene.add(this.dashTrail);
+        
+        // SLAM RING
+        // Save the MATERIAL to 'this.slamRingMaterial' so the Registry can fade it
+        this.slamRingMaterial = new THREE.MeshBasicMaterial({ color: 0xffaa44, transparent: true, opacity: 0, side: THREE.DoubleSide });
+        this.slamRing = new THREE.Mesh(new THREE.RingGeometry(0.5, 3, 32), this.slamRingMaterial);
+        this.slamRing.rotation.x = -Math.PI/2;
+        this.slamRing.visible = false;
+        this.game.scene.add(this.slamRing);
+    }
+	
+	initAttack() {
         const self = this;
-        const speedMult = 1 / (1 + this.mods.attackSpeed);
+        
+        // 1. STATS CALCULATION
+        const totalSpeedMod = this.mods.attackSpeed + this.charDef.stats.attackSpeed;
+        const speedMult = 1 / (1 + totalSpeedMod);
+        const weaponType = this.charDef.weapon || 'standard';
+
+        // 2. WEAPON TUNING
+        let windup = 200, action = 150, cooldown = 350;
+        
+        if (weaponType === 'heavy') { 
+            // Ironclad: Slow, heavy recoil
+            windup = 300; action = 100; cooldown = 800; 
+        } else if (weaponType === 'swift') { 
+            // Weaver: Machine gun rapid fire
+            windup = 50; action = 100; cooldown = 200; 
+        }
+
+        // 3. THE ACTION DEFINITION
         this.attackAction = new Action({
-            windupTime: 150 * speedMult, actionTime: 100 * speedMult, cooldownTime: 250 * speedMult,
-            onWindup: () => { self.attackMesh.material.opacity = 0.3; self.attackMesh.position.z = -0.4; self.attackMesh.scale.set(0.5, 1, 0.5); },
-            onAction: () => { self.attackMesh.material.opacity = 0.8; self.attackMesh.position.z = -1.0; self.attackMesh.scale.set(1, 1, 1); self.game.screenShake(0.1, 2); self.performAttackHit(); },
-            onCooldown: () => { self.attackMesh.material.opacity = 0.2; },
-            onFinish: () => { self.attackMesh.material.opacity = 0; self.attackMesh.position.z = -0.8; self.attackMesh.scale.set(1, 1, 1); },
+            windupTime: windup * speedMult,
+            actionTime: action * speedMult,
+            cooldownTime: cooldown * speedMult,
+            
+            onWindup: () => { 
+                // Visual Telegraph
+                if (weaponType === 'standard') {
+                    // Show Sword Swipe
+                    self.attackMesh.material.opacity = 0.3; 
+                    self.attackMesh.position.z = -0.4; 
+                    self.attackMesh.scale.set(0.5, 1, 0.5); 
+                } else {
+                    // Gun Charge-up (Flash)
+                    self.baseMaterial.emissiveIntensity = 1.0;
+                }
+            },
+            
+            onAction: () => { 
+                self.game.screenShake(0.1, 2);
+                
+                // === A. WANDERER (MELEE) ===
+                if (weaponType === 'standard') {
+                    self.attackMesh.material.opacity = 0.8; 
+                    self.attackMesh.position.z = -1.0; 
+                    self.attackMesh.scale.set(1, 1, 1); 
+                    self.performAttackHit(); 
+                } 
+                
+                // === B. IRONCLAD (SHOTGUN) ===
+                else if (weaponType === 'heavy') {
+                    // Forward direction
+                    const baseAngle = self.mesh.rotation.y + Math.PI; 
+                    // Recoil (Push player back)
+                    const knockX = Math.sin(baseAngle) * 0.5;
+                    const knockZ = Math.cos(baseAngle) * 0.5;
+                    self.mesh.position.x -= knockX; 
+                    self.mesh.position.z -= knockZ;
+
+                    // Spawn 5 Pellets
+                    const count = 5;
+                    const spread = 0.8; // ~45 degrees
+                    const pelletDmg = self.attackDamage * 0.4; // 40% dmg per pellet (200% total if point blank)
+                    
+                    for (let i = 0; i < count; i++) {
+                        // Calculate fan angle
+                        const angle = baseAngle - (spread/2) + (spread * (i/(count-1)));
+                        const p = new PlayerProjectile(self.game, self.mesh.position.x, self.mesh.position.z, angle, 'shrapnel', pelletDmg);
+                        self.game.entities.push(p); 
+                        self.game.scene.add(p.mesh);
+                    }
+                }
+                
+                // === C. WEAVER (HOMING) ===
+                else if (weaponType === 'swift') {
+                    const angle = self.mesh.rotation.y + Math.PI;
+                    // Lower damage per shot, but high fire rate
+                    const boltDmg = self.attackDamage * 0.7; 
+                    
+                    const p = new PlayerProjectile(self.game, self.mesh.position.x, self.mesh.position.z, angle, 'bolt', boltDmg);
+                    self.game.entities.push(p);
+                    self.game.scene.add(p.mesh);
+                }
+            },
+            
+            onCooldown: () => { 
+                self.attackMesh.material.opacity = 0.2; 
+                self.baseMaterial.emissiveIntensity = 0.3; // Reset flash
+            },
+            
+            onFinish: () => { 
+                self.attackMesh.material.opacity = 0; 
+                self.attackMesh.position.z = -0.8; 
+                self.attackMesh.scale.set(1, 1, 1); 
+            },
+            
             onUpdate: (action) => { self.updateActionUI(action); }
         });
     }
@@ -74,43 +229,65 @@ class Player {
         this.game.scene.add(this.slamRing);
     }
     
-    initUI() {
-        this.ui = {
-            healthActive: document.getElementById('health-active'),
-            healthMax: document.getElementById('health-max'),
-            healthReserve: document.getElementById('health-reserve'),
-            actionBar: document.getElementById('action-bar'),
-            actionBarFill: document.getElementById('action-bar-fill'),
-            actionLabel: document.getElementById('action-label')
+	initUI() {
+        if (!this.game.hud) return;
+        
+        // Sync Labels
+        const map = {
+            mobility: 'slot_mobility',
+            secondary: 'slot_secondary',
+            utility: 'slot_utility',
+            mastery: 'slot_mastery'
         };
+        
+        for (const [slot, hudId] of Object.entries(map)) {
+            if (this.actions[slot]) {
+                // Use the Ability Name (First word or short code)
+                let name = this.actions[slot].def.name.split(' ')[0].toUpperCase();
+                // Shorten huge names
+                if (name.length > 5) name = name.substring(0, 4);
+                this.game.hud.setAbilityLabel(hudId, name);
+            } else {
+                this.game.hud.setAbilityLabel(hudId, '-');
+            }
+        }
+        
         this.updateHealthUI();
     }
     
     updateHealthUI() {
-        this.ui.healthActive.style.width = (this.health.getActiveRatio() * 100) + '%';
-        this.ui.healthMax.style.width = (this.health.getCurrentMaxRatio() * 100) + '%';
-        this.ui.healthReserve.style.width = (this.health.getReserveRatio() * 100) + '%';
+        if (this.game && this.game.hud) {
+            this.game.hud.updateHealth(this.health);
+        }
     }
     
     updateActionUI(action) {
-        this.ui.actionBarFill.style.width = (action.getTotalProgress() * 100) + '%';
-        this.ui.actionBar.className = action.status;
-        const labels = { idle: 'Ready', windup: 'Charging...', action: 'STRIKE!', cooldown: 'Recovering' };
-        this.ui.actionLabel.textContent = labels[action.status] || 'Ready';
+        if (this.game && this.game.hud) {
+            this.game.hud.updateAction(action);
+        }
     }
     
-    performAttackHit() {
+	performAttackHit(range = 1.5, damage = 1) {
         const attackPos = new THREE.Vector3();
         this.attackMesh.getWorldPosition(attackPos);
         if (this.game.enemies) {
             for (const enemy of this.game.enemies) {
                 if (!enemy.mesh) continue;
-                if (attackPos.distanceTo(enemy.mesh.position) < 1.5) enemy.takeDamage(this.attackDamage);
+                if (attackPos.distanceTo(enemy.mesh.position) < range) enemy.takeDamage(damage);
             }
         }
     }
     
-    onDeath() { this.dead = true; this.game.triggerGameOver(); }
+    onDeath() { 
+        this.dead = true; 
+        
+        // FIX: Visual cleanup
+        this.mesh.visible = false; // Hide the player box
+        this.game.spawnParticleBurst(this.mesh.position.x, this.mesh.position.z, 0x44aaff, 20); // Big blue explosion
+        this.game.screenShake(0.4, 8); // Heavy impact shake
+        
+        this.game.triggerGameOver(); 
+    }
     
     flashDamage() {
         this.baseMaterial.emissive.setHex(0xff0000); this.baseMaterial.emissiveIntensity = 1;
@@ -138,109 +315,232 @@ class Player {
         if (needsRecalc) this.recalculateStats();
     }
     
+	// Called when buying upgrades to pull fresh Meta data
+    refreshStats() {
+        // 1. Re-fetch Meta Mods
+        this.mods = MetaProgression.getStatMods();
+        
+        // 2. Update Base Stats (Stats from Character + Meta)
+        this.baseSpeed = 4.0 * (1 + this.mods.moveSpeed + (this.charDef.stats.moveSpeed||0));
+        this.baseAttackDamage = 1 + this.mods.attackDamage + (this.charDef.stats.attackDamage||0);
+        
+        // 3. Update Health Pools (Grow max, keep current ratio or just add flat?)
+        // Simple approach: Update max, current stays same (percentage drops)
+        const oldMaxActive = this.health.maxActive;
+        const oldMaxReserve = this.health.maxReserve;
+        
+        this.health.maxActive = 5 + this.mods.maxHealth + (this.charDef.stats.maxHealth||0);
+        this.health.maxReserve = 10 + this.mods.maxReserve + (this.charDef.stats.maxReserve||0);
+        
+        // Optional: Heal the difference if you want upgrades to feel good immediately
+        if (this.health.maxActive > oldMaxActive) this.health.active += (this.health.maxActive - oldMaxActive);
+        if (this.health.maxReserve > oldMaxReserve) this.health.reserve += (this.health.maxReserve - oldMaxReserve);
+        
+        this.health.activeRegen = 0.1 + this.mods.regenRate;
+
+        // 4. Re-run Buff calculations
+        this.recalculateStats();
+        
+        // 5. Update HUD immediately
+        this.updateHealthUI();
+		this.updateEssenceUI();
+    }
+
     recalculateStats() {
-        this.speed = this.baseSpeed * (1 + this.mods.moveSpeed);
+        // Start from the (possibly updated) base
+        this.speed = this.baseSpeed;
         this.attackDamage = this.baseAttackDamage;
+        
+        // Apply Buffs
         if (this.buffs.speed) this.speed *= this.buffs.speed.multiplier;
         if (this.buffs.damage) this.attackDamage *= this.buffs.damage.multiplier;
+        
+        // Debug
+        // console.log(`Stats: Spd ${this.speed.toFixed(1)}, Dmg ${this.attackDamage.toFixed(1)}`);
     }
     
-    update(deltaTime, elapsed) {
+	update(deltaTime, elapsed) {
+        if (this.game.dialogueSystem && this.game.dialogueSystem.isOpen) return;
         if (this.dead) return;
+        
+        this.health.update(deltaTime);
+        this.updateBuffs(deltaTime);
+
+        // 1. UPDATE ACTIONS
+        for (const slot in this.actions) {
+            this.actions[slot].update(deltaTime * 1000);
+        }
+
         const input = this.game.input;
         
-        for (const id in this.abilityCooldowns) if (this.abilityCooldowns[id] > 0) this.abilityCooldowns[id] -= deltaTime;
-        for (const ability of AbilityRegistry.list()) if (ability.onUpdate) ability.onUpdate(this, this.game, deltaTime);
+        // 2. INPUT & CANCELLING
         
-        if (!this.isDashing && !this.isSlamming) {
-            // Get Aim Direction
+        // Helper to check cost/conditions before triggering
+        const tryTrigger = (action) => {
+            if (action.def.canActivate) {
+                if (!action.def.canActivate(this)) {
+                    // Optional: Feedback for "Not enough energy"
+                    // this.game.spawnFloatingText(this.mesh.position.x, this.mesh.position.z, "NO ENERGY", 0xff0000, 0.5);
+                    return false;
+                }
+            }
+            return action.trigger();
+        };
+
+        // --- PRIMARY (Left Click) ---
+        if (this.actions.primary) {
+            if (this.actions.primary.status === 'windup' && !input.isMouseHeld(0)) {
+                this.actions.primary.reset();
+                if(this.actions.primary.def.onFinish) this.actions.primary.def.onFinish(this, this.game);
+                this.updateActionUI(this.actions.primary);
+            }
+            if (input.isMouseHeld(0)) tryTrigger(this.actions.primary);
+        }
+
+        // --- SECONDARY (Right Click) ---
+        if (this.actions.secondary) {
+            if (this.actions.secondary.status === 'windup' && !input.isMouseHeld(2)) {
+                if (this.actions.secondary.def.releaseToFire) {
+                    this.actions.secondary.currentTime = this.actions.secondary.windupTime; // COMMIT
+                } else {
+                    this.actions.secondary.reset(); // CANCEL
+                    if(this.actions.secondary.def.onFinish) this.actions.secondary.def.onFinish(this, this.game);
+                    this.updateActionUI(this.actions.secondary);
+                }
+            }
+            if (input.isMouseHeld(2)) tryTrigger(this.actions.secondary);
+        }
+
+        // --- UTILITY (Q) ---
+        if (this.actions.utility) {
+            if (this.actions.utility.status === 'windup' && !input.isHeld('KeyQ')) {
+                if (this.actions.utility.def.releaseToFire) {
+                    this.actions.utility.currentTime = this.actions.utility.windupTime; // COMMIT
+                } else {
+                    this.actions.utility.reset(); // CANCEL
+                    if(this.actions.utility.def.onFinish) this.actions.utility.def.onFinish(this, this.game);
+                }
+            }
+            if (input.wasPressed('KeyQ')) tryTrigger(this.actions.utility);
+        }
+
+        // --- MOBILITY & MASTERY ---
+        if (this.actions.mobility && input.wasPressed('ShiftLeft')) tryTrigger(this.actions.mobility);
+        if (this.actions.mastery && input.wasPressed('KeyF')) tryTrigger(this.actions.mastery);
+
+        // 3. MOVEMENT LOGIC
+        let moveSpeed = this.speed;
+        
+        // FIX: Movement Locking
+        // Windup = Slow (0.5x), Action = STOP (0x), Cooldown = Full
+        if (this.actions.primary) {
+            if (this.actions.primary.status === 'windup') moveSpeed *= 0.5;
+            if (this.actions.primary.status === 'action') moveSpeed = 0; // Lock feet while swinging
+        }
+        
+        // Velocity Override (Dash)
+        if (this.velocityOverride) {
+            this.velocityOverride.time -= deltaTime;
+            const nextX = this.mesh.position.x + this.velocityOverride.x * deltaTime;
+            const nextZ = this.mesh.position.z + this.velocityOverride.z * deltaTime;
+            
+            if (this.game.world) {
+                if (!this.game.world.checkCollision(nextX, this.mesh.position.z, 0.3)) this.mesh.position.x = nextX;
+                if (!this.game.world.checkCollision(this.mesh.position.x, nextZ, 0.3)) this.mesh.position.z = nextZ;
+            } else {
+                this.mesh.position.x = nextX; this.mesh.position.z = nextZ;
+            }
+            if (this.velocityOverride.time <= 0) this.velocityOverride = null;
+            
+        } else {
+            // Standard Movement
+            const movement = input.getMovementVector();
             const mousePos = this.game.getMouseWorldPosition();
             const dx = mousePos.x - this.mesh.position.x;
             const dz = mousePos.z - this.mesh.position.z;
             const mouseAngle = Math.atan2(dx, dz) + Math.PI;
 
-            if (this.attackAction.status === 'idle' || this.attackAction.status === 'cooldown') {
-                const movement = input.getMovementVector();
-                const isMoving = movement.x !== 0 || movement.z !== 0;
+            // Only move if speed > 0 (prevents sliding during attack)
+            if ((movement.x !== 0 || movement.z !== 0) && moveSpeed > 0) {
+                const moveDist = moveSpeed * deltaTime;
+                const nextX = this.mesh.position.x + movement.x * moveDist;
+                const nextZ = this.mesh.position.z + movement.z * moveDist;
+                
+                let canMoveX = true;
+                if (this.game.world && this.game.world.checkCollision(nextX, this.mesh.position.z)) canMoveX = false;
+                let canMoveZ = true;
+                if (this.game.world && this.game.world.checkCollision(this.mesh.position.x, nextZ)) canMoveZ = false;
+                
+                if (canMoveX) this.mesh.position.x = nextX;
+                if (canMoveZ) this.mesh.position.z = nextZ;
+                
+                if (!input.isMouseHeld(0)) this.mesh.rotation.y = Math.atan2(movement.x, movement.z) + Math.PI;
+            }
+            
+		
+			// FIX: AIM OVERRIDE
+			// Check if ANY action is active (Primary, Secondary, Utility, etc.)
+			let isAiming = input.isMouseHeld(0); // Always aim if LMB held
+			
+			// Check all slots for 'windup' or 'action' status
+			const slots = ['primary', 'secondary', 'mobility', 'utility', 'mastery'];
+			for (const slot of slots) {
+				if (this.actions[slot]) {
+					const status = this.actions[slot].status;
+					if (status === 'windup' || status === 'action') {
+						isAiming = true;
+						break;
+					}
+				}
+			}
 
-                // ROTATION: Move direction if running, otherwise look at mouse
-                if (isMoving) {
-                     this.mesh.rotation.y = Math.atan2(movement.x, movement.z) + Math.PI;
+			if (isAiming) {
+				this.mesh.rotation.y = mouseAngle;
+			}
+        }
+
+		// 4. HUD UPDATES
+        if (this.game.hud) {
+            if (this.actions.primary) this.game.hud.updateAction(this.actions.primary);
+            
+            // Helper to update generic slots
+            const updateSlot = (action, hudId) => {
+                if (action) {
+                    let cd = 0;
+                    if (action.status === 'cooldown') {
+                        cd = 1 - (action.currentTime - action.windupTime - action.actionTime) / action.cooldownTime;
+                    } else if (action.status !== 'idle') {
+                        cd = 1; 
+                    }
+                    
+                    // CHECK COST
+                    let affordable = true;
+                    if (action.def.canActivate) {
+                        affordable = action.def.canActivate(this);
+                    }
+                    
+                    this.game.hud.setAbilityIcon(hudId, cd <= 0, cd, affordable);
                 } else {
-                     this.mesh.rotation.y = mouseAngle;
+                    this.game.hud.setAbilityIcon(hudId, false, 0); 
                 }
-                
-                // MOVEMENT
-                if (isMoving) {
-                    const moveDist = this.speed * deltaTime;
-                    const nextX = this.mesh.position.x + movement.x * moveDist;
-                    const nextZ = this.mesh.position.z + movement.z * moveDist;
-                    
-                    let canMoveX = true;
-                    if (this.game.world && this.game.world.checkCollision(nextX, this.mesh.position.z)) canMoveX = false;
-                    
-                    let canMoveZ = true;
-                    if (this.game.world && this.game.world.checkCollision(this.mesh.position.x, nextZ)) canMoveZ = false;
-                    
-                    if (canMoveX) this.mesh.position.x = nextX;
-                    if (canMoveZ) this.mesh.position.z = nextZ;
-                }
-            } else if (this.attackAction.status === 'windup') {
-                // Aim at mouse while charging
-                this.mesh.rotation.y = mouseAngle;
-                
-                // Allow movement while charging
-                const movement = input.getMovementVector();
-                if (movement.x !== 0 || movement.z !== 0) {
-                    const moveDist = (this.speed * 0.7) * deltaTime; // Slower while charging
-                    const nextX = this.mesh.position.x + movement.x * moveDist;
-                    const nextZ = this.mesh.position.z + movement.z * moveDist;
-                     let canMoveX = true;
-                    if (this.game.world && this.game.world.checkCollision(nextX, this.mesh.position.z)) canMoveX = false;
-                    
-                    let canMoveZ = true;
-                    if (this.game.world && this.game.world.checkCollision(this.mesh.position.x, nextZ)) canMoveZ = false;
-                    
-                    if (canMoveX) this.mesh.position.x = nextX;
-                    if (canMoveZ) this.mesh.position.z = nextZ;
-                }
-                
-                // Cancel if button released
-                if (!input.isMouseHeld(0)) {
-                    this.attackAction.reset();
-                    // Visual reset
-                    this.attackMesh.material.opacity = 0;
-                    this.ui.actionBarFill.style.width = '0%';
-                }
-            }
-            
-            // Abilities
-            for (const ability of AbilityRegistry.list()) {
-                let triggered = false;
-                if (ability.key && input.wasPressed(ability.key)) triggered = true;
-                if (ability.altKey && input.wasPressed(ability.altKey)) triggered = true;
-                if (ability.mouseButton !== undefined && input.wasMousePressed(ability.mouseButton)) triggered = true;
-                
-                if (triggered) this.tryAbility(ability.id);
-            }
-            
-            // Start Attack
-            if (input.isMouseHeld(0) && this.attackAction.status === 'idle') {
-                this.attackAction.trigger();
-            }
+            };
+
+            updateSlot(this.actions.mobility, 'slot_mobility');
+            updateSlot(this.actions.secondary, 'slot_secondary');
+            updateSlot(this.actions.utility, 'slot_utility');
+            updateSlot(this.actions.mastery, 'slot_mastery');
         }
         
-        this.attackAction.update(deltaTime * 1000);
-        this.health.update(deltaTime);
-        this.updateBuffs(deltaTime);
-        
-        const bobAmount = (this.attackAction.status === 'idle' && !this.isDashing && !this.isSlamming) ? 0.03 : 0.01;
+        const bobAmount = (this.actions.primary && this.actions.primary.status === 'idle' && !this.velocityOverride) ? 0.03 : 0.01;
         this.mesh.position.y = 0.5 + Math.sin(elapsed * 3) * bobAmount;
-        
-        if (this.attackAction.status === 'idle' && this.attackAction.isComplete) {
-            this.ui.actionBarFill.style.width = '0%';
-            this.ui.actionLabel.textContent = 'Ready';
-            this.attackAction.isComplete = false;
+    }
+	
+	updateEssenceUI() {
+        // The HUD updateStats method expects three arguments: time, kills, essence.
+        // When in the hub, time/kills are fixed, so we only need to pass the banked essence.
+        if (this.game && this.game.hud && this.game.currentBiome === 'sanctuary') {
+             // We can pass the static hub run stats, but replace the essence with the banked value.
+             this.game.hud.updateStats('--:--', '-', MetaProgression.data.essence);
         }
     }
     
@@ -253,5 +553,18 @@ class Player {
         const ability = AbilityRegistry.get(abilityId);
         if (!ability) return 0;
         return Math.max(0, this.abilityCooldowns[abilityId] / ability.cooldown);
+    }
+	
+	takeDamage(amount) {
+        // 1. Invulnerability Checks
+        if (this.dead || this.isInvulnerable || this.isDashing) return;
+
+        // 2. Apply Damage
+        this.health.delta(-amount);
+        
+        // 3. Feedback
+        this.flashDamage();
+        
+        // Note: The Health Pool's 'onChanged' callback handles the HUD update automatically
     }
 }

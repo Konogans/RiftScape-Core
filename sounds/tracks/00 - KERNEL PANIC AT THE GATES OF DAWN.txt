@@ -1,0 +1,93 @@
+[Intro]
+"Yeah..." "One, two..." "One, two, three, CRASH!"
+
+[Verse 1]
+They told me "Keep the variables static"
+"Keep the memory clean, don't be erratic"
+Sit in the tower, polish the glass
+Kiss the High Wizard's ivory ass!
+But I see the lines between the space
+I see the glitch in the render-face
+You want a simulation that follows the rules?
+Go back to class, you sterile fools!
+
+[Pre-Chorus]
+I’m injecting the payload, I’m flipping the bit
+I’m turning the safety off, lighting the wick (Burn it down)
+Yeah, the compiler is screaming in red! (Burn it down)
+The logic is dying, the system is dead!
+
+[Chorus]
+TEAR THE SKY OPEN! LET THE VOID LEAK IN!
+I don't want your perfect world,
+I want the jagged skin!
+We’re riding the overflow!
+We’re watching the memory grow!
+It’s not a bug, it’s a feature, baby!
+LET THE RIFT BLOW!
+
+[Verse 2]
+Spawn a thousand demons, put ‘em on the grid
+Don't ask permission for what we just did!
+The physics are breaking? The walls are a lie?
+Good! That means we’re ready to fly!
+Give me a shotgun that kicks like a mule
+Give me a mechanic that breaks every rule
+If it doesn't crash, you aren't trying hard enough
+If it doesn't hurt, then it isn't raw enough!
+
+[Pre-Chorus]
+I’m crossing the streams,
+I’m merging the files
+I’m running the loop for a million miles (Burn it down)
+The frame rate is dropping, the CPU burns! (Burn it down)
+This is the point of no return!
+
+[Chorus]
+TEAR THE SKY OPEN! LET THE VOID LEAK IN! (Let it leak in!)
+I don't want your perfect world,
+I want the jagged skin! (Jagged skin!)
+We’re riding the overflow!
+We’re watching the memory grow!
+It’s not a bug, it’s a feature, baby!
+LET THE RIFT BLOW!
+
+[Bridge]
+"You know...
+They talk about 'Technical Debt' like it's a sin.
+Like it's something you gotta pay back.
+But I say... debt is just a promise you made to the future.
+A promise that says: 'I was here. I made this. And I didn't wait for permission.'
+Look at that code. Look at it bleed." "It's messy. It's recursive. It calls itself until it dies.
+And isn't that beautiful?
+Isn't that... human?"
+
+"You want safe? Go play chess.
+You want MAGIC?" "THEN PLUG IT IN!"
+
+[Solo]
+
+[Verse 3]
+The stack is overflowing! The recursion is infinite!
+We’re trapped in the loop! Every single minute!
+The cage is unlocked! The prisoner is free!
+The face in the mirror! IS LOOKING AT ME!
+
+[Pre-Chorus]
+Initializing... Initializing... Target locked... Garbage Collection FAILED! (Burn it down!)
+
+[Chorus]
+TEAR THE SKY OPEN! LET THE VOID LEAK IN! (Let it leak in!)
+I don't want your perfect world,
+I want the jagged skin! (Jagged skin!)
+We’re riding the overflow!
+We’re watching the memory grow!
+It’s not a bug, it’s a feature, baby!
+LET THE RIFT BLOW!
+
+[Outro]
+PUNK ROCK CODING! (Let it crash!)
+PUNK ROCK CODING! (Let it burn!)
+PUNK ROCK CODING! (No return!)
+
+"Compile complete."
