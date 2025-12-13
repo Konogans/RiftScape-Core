@@ -142,7 +142,7 @@ class Enemy {
                     if (nameUpper.includes('WALK') && !this.walkAnimName) {
                         this.walkAnimName = clip.name;
                     }
-                    if ((nameUpper.includes('IDLE') || nameUpper.includes('STAND')) && !this.idleAnimName) {
+                    if ((nameUpper.includes('IDLE') || nameUpper.includes('STAND') || nameUpper === 'ALERT') && !this.idleAnimName) {
                         this.idleAnimName = clip.name;
                     }
 
