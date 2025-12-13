@@ -146,6 +146,7 @@ class Enemy {
                             const totalAttackDuration = (t.windup + t.action + t.cooldown) / 1000; // seconds
                             const timeScale = clip.duration / totalAttackDuration;
                             action.setEffectiveTimeScale(timeScale);
+                            console.log(`[Enemy] Attack animation: clip=${clip.duration.toFixed(2)}s, target=${totalAttackDuration.toFixed(2)}s, timeScale=${timeScale.toFixed(2)}`);
                         }
                     }
 
