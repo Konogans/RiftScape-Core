@@ -132,41 +132,76 @@ class Enemy {
                     const action = this.mixer.clipAction(clip);
                     action.setLoop(THREE.LoopRepeat);
                     this.animActions[clip.name] = action;
+                    const nameUpper = clip.name.toUpperCase();
+
+                    // Detect locomotion animations (run, walk, idle)
+                    // Supports various naming: Run, Running, Run Fast, Walk, Walking, Idle, Stand
+                    if ((nameUpper.includes('RUN') || nameUpper.includes('SPRINT')) && !this.runAnimName) {
+                        this.runAnimName = clip.name;
+                    }
+                    if (nameUpper.includes('WALK') && !this.walkAnimName) {
+                        this.walkAnimName = clip.name;
+                    }
+                    if ((nameUpper.includes('IDLE') || nameUpper.includes('STAND')) && !this.idleAnimName) {
+                        this.idleAnimName = clip.name;
+                    }
 
                     // Special handling for attack animations
-                    // Supports: Attack, Skill_XX (alternative naming)
-                    const isAttack = clip.name.includes('Attack') || clip.name.startsWith('Skill');
+                    // Supports: Attack (or Skill with attack-like number suffix)
+                    const isAttack = nameUpper.includes('ATTACK');
                     if (isAttack && !this.attackClipAction) {
                         action.setLoop(THREE.LoopOnce, 0);
                         action.clampWhenFinished = true;
                         this.attackClipAction = action;
-                        this.attackAnimName = clip.name; // Store actual name
+                        this.attackAnimName = clip.name;
 
                         // OPTION A: Sync animation to play fully over attack duration
-                        // Full animation plays over (windup + action + cooldown)
                         if (this.def.attackTiming) {
                             const t = this.def.attackTiming;
-                            const totalAttackDuration = (t.windup + t.action + t.cooldown) / 1000; // seconds
+                            const totalAttackDuration = (t.windup + t.action + t.cooldown) / 1000;
                             const timeScale = clip.duration / totalAttackDuration;
-                            this.attackTimeScale = timeScale; // Store for re-application after reset()
+                            this.attackTimeScale = timeScale;
                             action.setEffectiveTimeScale(timeScale);
                         }
                     }
 
                     // Special handling for death animations
-                    // Supports: Death, Dead, Die, BeHit_FlyUp (alternative naming)
-                    const isDeath = clip.name.includes('Death') || clip.name.includes('Dead') ||
-                                    clip.name.includes('Die') || clip.name.includes('BeHit');
+                    // Supports: Death, Dead, Die, BeHit (hit reaction used as death)
+                    const isDeath = nameUpper.includes('DEATH') || nameUpper.includes('DEAD') ||
+                                    nameUpper.includes('DIE') || nameUpper.includes('BEHIT');
                     if (isDeath && !this.deathClipAction) {
                         action.setLoop(THREE.LoopOnce, 0);
                         action.clampWhenFinished = true;
                         this.deathClipAction = action;
                         this.deathClipDuration = clip.duration;
-                        this.deathAnimName = clip.name; // Store actual name
+                        this.deathAnimName = clip.name;
                     }
                 });
 
-                this.playAnim('Idle');
+                // Fallback: if no Attack found but has Skill animations, use highest-numbered Skill as attack
+                if (!this.attackAnimName) {
+                    const skillAnims = Object.keys(this.animActions).filter(n => n.toUpperCase().startsWith('SKILL'));
+                    if (skillAnims.length > 0) {
+                        // Sort to get highest number (Skill_03 > Skill_01)
+                        skillAnims.sort().reverse();
+                        this.attackAnimName = skillAnims[0];
+                        const action = this.animActions[this.attackAnimName];
+                        action.setLoop(THREE.LoopOnce, 0);
+                        action.clampWhenFinished = true;
+                        this.attackClipAction = action;
+
+                        if (this.def.attackTiming) {
+                            const t = this.def.attackTiming;
+                            const totalAttackDuration = (t.windup + t.action + t.cooldown) / 1000;
+                            const timeScale = action.getClip().duration / totalAttackDuration;
+                            this.attackTimeScale = timeScale;
+                            action.setEffectiveTimeScale(timeScale);
+                        }
+                    }
+                }
+
+                // Start with idle (or first available locomotion)
+                this.playAnim(this.idleAnimName || this.walkAnimName || this.runAnimName || 'Idle');
             }
         } catch (e) {
             console.warn('[Enemy] Model load failed:', e);
@@ -474,13 +509,13 @@ class Enemy {
             const actualSpeed = distMoved / Math.max(deltaTime, 0.001);
             this.lastPos = { x: pos.x, z: pos.z };
 
-            // Choose animation based on actual movement speed
-            if (actualSpeed > 2.0) {
-                this.playAnim('Running');
-            } else if (actualSpeed > 0.3) {
-                this.playAnim('Walking');
-            } else {
-                this.playAnim('Idle');
+            // Choose animation based on actual movement speed (use stored names)
+            if (actualSpeed > 2.0 && this.runAnimName) {
+                this.playAnim(this.runAnimName);
+            } else if (actualSpeed > 0.3 && (this.walkAnimName || this.runAnimName)) {
+                this.playAnim(this.walkAnimName || this.runAnimName);
+            } else if (this.idleAnimName) {
+                this.playAnim(this.idleAnimName);
             }
         } else if (this.animController) {
             // Legacy animController fallback
@@ -508,6 +543,9 @@ class Enemy {
         this.attackAnimName = null;
         this.deathClipAction = null;
         this.deathAnimName = null;
+        this.runAnimName = null;
+        this.walkAnimName = null;
+        this.idleAnimName = null;
 
         // Legacy animController fallback
         if (this.animController) this.animController.dispose();
