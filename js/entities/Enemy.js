@@ -75,30 +75,106 @@ class Enemy {
     }
     
     async loadModel(x, z, scale) {
+        // Pattern from mods/riftling_remastered.js (V4.4) - proven working implementation
+        const gltfLoader = new THREE.GLTFLoader();
+
         try {
-            const { scene, animations } = await ModelLoader.load(this.def.model);
+            const glb = await new Promise((resolve, reject) => {
+                // Cache-bust to ensure unique instance per enemy
+                const cacheBuster = '?v=' + (Enemy._modelCounter = (Enemy._modelCounter || 0) + 1);
+                gltfLoader.load(this.def.model + cacheBuster, resolve, undefined, reject);
+            });
+
             const parent = this.mesh.parent;
             if (!this.game.entities.includes(this) && !parent) return;
-            
+
+            // Cleanup old mesh
             if (parent) {
                 parent.remove(this.mesh);
                 if (this.mesh.geometry) this.mesh.geometry.dispose();
                 if (this.material) this.material.dispose();
             }
-            this.mesh = scene;
+
+            // Setup new mesh from GLB
+            this.mesh = glb.scene;
             this.mesh.position.set(x, 0, z);
             this.mesh.scale.setScalar(scale);
             this.hasModel = true;
             this.baseY = 0;
-            
+
             if (parent) parent.add(this.mesh);
             else if (this.game.scene) this.game.scene.add(this.mesh);
-            
-            if (animations.length > 0 && this.def.animations) {
-                this.animController = new AnimationController(this.mesh, animations, this.def.animations);
-                this.animController.play('idle');
+
+            // Setup animation system
+            if (glb.animations && glb.animations.length > 0) {
+                this.mixer = new THREE.AnimationMixer(this.mesh);
+                this.animActions = {};
+                this.currentAnim = null;
+                this.lastPos = { x: x, z: z };
+                this.isAttackEnforced = false;
+                this.hasHitThisAttack = false;
+
+                glb.animations.forEach(clip => {
+                    const action = this.mixer.clipAction(clip);
+                    action.setLoop(THREE.LoopRepeat);
+                    this.animActions[clip.name] = action;
+
+                    // Special handling for attack animations
+                    if (clip.name.includes('Attack')) {
+                        action.setLoop(THREE.LoopOnce, 0);
+                        action.clampWhenFinished = true;
+                        this.attackClipAction = action;
+
+                        // OPTION A: Sync animation speed to AttackSystem timing
+                        // We want the "hit" moment (50% of clip) to align with windupTime
+                        if (this.def.attackTiming) {
+                            const hitPercent = 0.5; // Hit lands at 50% of animation
+                            const normalHitTime = clip.duration * hitPercent * 1000; // ms
+                            const desiredHitTime = this.def.attackTiming.windup; // ms
+                            const timeScale = normalHitTime / desiredHitTime;
+                            action.setEffectiveTimeScale(timeScale);
+                        }
+                    }
+                });
+
+                this.playAnim('Idle');
             }
-        } catch (e) { /* Model load failed, keep cube */ }
+        } catch (e) {
+            console.warn('[Enemy] Model load failed:', e);
+            // Keep cube fallback
+        }
+    }
+
+    /**
+     * Play animation with crossFade transition
+     * Pattern from mods/riftling_remastered.js (V4.4)
+     */
+    playAnim(name, fadeTime = 0.15) {
+        if (!this.animActions || this.currentAnim === name || !this.animActions[name]) return;
+
+        // Reset attack state when transitioning to attack
+        if (name.includes('Attack')) {
+            this.hasHitThisAttack = false;
+        }
+
+        // Stop previous attack action to release clampWhenFinished
+        if (this.attackClipAction && this.currentAnim && this.currentAnim.includes('Attack')) {
+            this.attackClipAction.stop();
+        }
+
+        const newAction = this.animActions[name];
+
+        if (this.currentAnim && this.animActions[this.currentAnim]) {
+            const oldAction = this.animActions[this.currentAnim];
+            newAction.reset();
+            newAction.play();
+            newAction.crossFadeFrom(oldAction, fadeTime, true);
+        } else {
+            newAction.reset();
+            newAction.play();
+        }
+
+        this.currentAnim = name;
     }
     
     initHealth(difficultyMult) {
@@ -180,44 +256,45 @@ class Enemy {
     
 	update(deltaTime, elapsed) {
         if (this.dead) return;
-        
+
         this.health.update(deltaTime);
-        
+
+        // Update animation mixer
+        if (this.mixer) this.mixer.update(deltaTime);
+
         // FIX 1: Time Scale
-        this.attackAction.update(deltaTime * 1000); 
-        
+        this.attackAction.update(deltaTime * 1000);
+
         if (this.attackCooldown > 0) this.attackCooldown -= deltaTime * 1000;
-        
-        // Flash timer... (keep existing code)
-        
+
         // FIX 3: Stop moving when attacking
         const isAttacking = this.attackAction.status === 'windup' || this.attackAction.status === 'action';
-        
+
         if (!isAttacking) {
              // Only move if we aren't busy swinging
              this.updateBehavior(deltaTime);
              const behaviorResult = BehaviorSystem.execute(this, this.currentBehavior, deltaTime, this.game);
-             
+
              // Check attack trigger
              if (behaviorResult.inRange && this.attackCooldown <= 0) {
                  this.attackAction.trigger();
              }
-             
+
              // Animation Walk/Idle
-             this.updateAnimation(behaviorResult, elapsed);
-             
+             this.updateAnimation(behaviorResult, elapsed, deltaTime);
+
         } else {
             // If we have a memorized target, look at it. Otherwise default to player.
             const target = this.currentTarget || this.game.player;
             const targetPos = target.mesh ? target.mesh.position : target.position;
-            
+
             // Safety check in case target died/vanished
             if (targetPos) {
                 this.mesh.lookAt(targetPos.x, this.mesh.position.y, targetPos.z);
             }
-            
-            // Animation Attack
-            if (this.animController) this.animController.play('attack', { loop: false });
+
+            // Animation Attack - use new system
+            this.playAnim('Attack');
         }
 		
 		if (this.flashTimer > 0) {
@@ -258,8 +335,27 @@ class Enemy {
         }
     }
     
-    updateAnimation(behaviorResult, elapsed) {
-        if (this.animController) {
+    updateAnimation(behaviorResult, elapsed, deltaTime) {
+        // New animation system using playAnim() with speed-based detection
+        if (this.mixer && this.animActions) {
+            // Speed-based movement detection (from riftling_remastered.js V4.4)
+            const pos = this.mesh.position;
+            const dx = pos.x - (this.lastPos?.x || pos.x);
+            const dz = pos.z - (this.lastPos?.z || pos.z);
+            const distMoved = Math.sqrt(dx * dx + dz * dz);
+            const actualSpeed = distMoved / Math.max(deltaTime, 0.001);
+            this.lastPos = { x: pos.x, z: pos.z };
+
+            // Choose animation based on actual movement speed
+            if (actualSpeed > 2.0) {
+                this.playAnim('Running');
+            } else if (actualSpeed > 0.3) {
+                this.playAnim('Walking');
+            } else {
+                this.playAnim('Idle');
+            }
+        } else if (this.animController) {
+            // Legacy animController fallback
             if (this.attackAction.status === 'windup' || this.attackAction.status === 'action') {
                 this.animController.play('attack', { loop: false });
             } else if (behaviorResult.dist > this.attackRange && this.speed > 0) {
@@ -268,13 +364,24 @@ class Enemy {
                 this.animController.play('idle');
             }
         } else {
-            // Bob animation for cubes
+            // Bob animation for cubes (no model)
             this.mesh.position.y = this.baseY + Math.sin(elapsed * 4 + this.mesh.position.x) * 0.02;
         }
     }
     
     dispose() {
+        // Cleanup new animation system
+        if (this.mixer) {
+            this.mixer.stopAllAction();
+            this.mixer = null;
+        }
+        this.animActions = null;
+        this.attackClipAction = null;
+
+        // Legacy animController fallback
         if (this.animController) this.animController.dispose();
+
+        // Cleanup mesh
         if (this.mesh.geometry) this.mesh.geometry.dispose();
         if (this.material) this.material.dispose();
     }

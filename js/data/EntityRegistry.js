@@ -31,21 +31,24 @@ EntityRegistry.register('default', {
     scale: 1,
     speed: { min: 1.5, max: 2.5 },
     health: { active: 3, reserve: 5 },
-    
+
+    // MODEL (loaded by Enemy.loadModel)
+    model: 'models/Riftling_Clean.glb',
+
     // BEHAVIOR (interpreted by BehaviorSystem)
     behavior: 'chase',
-    
-    // ATTACK (interpreted by AttackSystem)  
+
+    // ATTACK (interpreted by AttackSystem)
     attack: { type: 'melee', range: 1.2 },
     attackCooldown: 1500,
     attackTiming: { windup: 300, action: 100, cooldown: 400 },
-    
+
     // LOOT (interpreted by LootSystem or spawn logic)
     loot: {
         essence: { chance: 0.8, min: 1, max: 2 },
         health: { chance: 0.1, value: 1 }
     },
-    
+
     lore: 'A minor creature drawn through the rifts.'
 });
 
