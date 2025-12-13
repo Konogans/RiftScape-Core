@@ -1,0 +1,397 @@
+# RiftScape Core Engine - Project Review & Next Steps
+
+**Review Date:** December 2024
+**Engine Version:** v3.0
+**Reviewer:** Claude AI
+
+---
+
+## Executive Summary
+
+RiftScape Core is a **well-architected browser-based action RPG** built on vanilla JavaScript and THREE.js. The project follows a "Punk Rock Coding" philosophy that prioritizes developer velocity over architectural purity. The codebase is approximately **6,500+ lines of JavaScript** with a clean separation between data (registries) and logic (systems).
+
+### Overall Assessment: **MVP 95% Complete**
+
+| Category | Status | Score |
+|----------|--------|-------|
+| Core Game Loop | Complete | 10/10 |
+| Player Systems | Complete | 9/10 |
+| Enemy AI & Behavior | Complete | 8/10 |
+| World Generation | Complete | 9/10 |
+| Meta-Progression | Complete | 9/10 |
+| Animation System | Incomplete | 5/10 |
+| Sound System | Partial | 6/10 |
+| Visual Polish | Needs Work | 6/10 |
+
+---
+
+## I. Architecture Review
+
+### Strengths
+
+1. **Clean Data-Logic Separation**
+   - All game content defined in registries (`AbilityRegistry`, `EntityRegistry`, etc.)
+   - Easy to add new content without touching core logic
+   - Perfect foundation for modding
+
+2. **Efficient Spatial Systems**
+   - Chunk-based world loading prevents memory bloat
+   - Spatial grid enables O(1) collision queries
+   - Flow field pathfinding runs at 5Hz (performance optimized)
+
+3. **Modular Entity System**
+   - Each entity manages its own lifecycle (`update()`, `dispose()`)
+   - Self-contained classes reduce coupling
+   - Hot-swappable via ModManager
+
+4. **Zero Friction Development**
+   - No build step means instant iteration
+   - Drag-and-drop modding enables live debugging
+   - Global state intentionally exposed for rapid prototyping
+
+### Technical Debt
+
+| Issue | Impact | Remediation |
+|-------|--------|-------------|
+| No Type Safety | Runtime errors possible | Add JSDoc annotations for critical APIs |
+| Animation Code Scattered | Hard to maintain | Centralize in entity base or system |
+| Sound System Incomplete | Missing music support | Implement Web Audio file loading |
+| Some Memory Leaks | Long session degradation | Audit all `dispose()` methods |
+
+---
+
+## II. Code Quality Assessment
+
+### File-by-File Analysis
+
+| File | Lines | Quality | Notes |
+|------|-------|---------|-------|
+| `js/core/Game.js` | ~638 | Good | Main loop clean, state management solid |
+| `js/core/WorldManager.js` | ~400 | Good | Chunk system well-implemented |
+| `js/core/Utils.js` | ~262 | Good | PointPool, Action classes work well |
+| `js/entities/Player.js` | ~300 | Good | Loadout system functional |
+| `js/entities/Enemy.js` | ~150 | Fair | Animation integration fragile |
+| `js/entities/Boss.js` | ~100 | Fair | Memory leak in moshRing |
+| `js/systems/RaidManager.js` | ~150 | Good | Wave system complete |
+| `js/ui/HUDSystem.js` | ~300 | Good | Canvas-based, performant |
+
+### Pattern Compliance
+
+The codebase consistently follows the project's stated patterns:
+
+- **Registry Pattern**: All content in `js/data/*Registry.js` files
+- **Global State**: Managers accessible via `window.Game`, `window.WorldState`
+- **Entity Lifecycle**: All entities have `update()` and `dispose()` methods
+- **No Build Tools**: Pure ES6+ with CDN-loaded THREE.js
+
+---
+
+## III. Known Bugs Analysis
+
+### Critical Priority
+
+#### B-001: Animation De-sync in Enemy.js
+**Location:** `js/entities/Enemy.js`
+**Impact:** Enemies don't play correct animations (attack/walk/idle)
+**Root Cause:** Animation logic scattered between core and mods; no consistent state machine
+**Fix Approach:**
+1. Remove animation logic from `mods/` directory
+2. Implement animation state machine directly in `Enemy.update()`
+3. Sync animation state with `attackAction.status` and movement velocity
+
+### High Priority
+
+#### B-002: Boss Memory Leak
+**Location:** `js/entities/Boss.js`
+**Impact:** `moshRing` geometry/material not disposed, memory grows over time
+**Fix:** Add explicit disposal in `Boss.dispose()`:
+```javascript
+if (this.moshRing) {
+    if (this.moshRing.geometry) this.moshRing.geometry.dispose();
+    if (this.moshRing.material) this.moshRing.material.dispose();
+    this.game.scene.remove(this.moshRing);
+}
+```
+
+### Low Priority
+
+#### B-003: Projectile Collision Radius
+**Location:** `js/entities/Projectile.js`
+**Impact:** Projectiles use fixed 0.6 radius, feels inconsistent
+**Fix:** Use enemy's defined `radius` property for collision checks
+
+---
+
+## IV. Priority Ranking of Next Steps
+
+Based on impact and dependencies, here's the recommended priority order:
+
+### Priority 1: Critical Bug Fixes (Blocks Visual Polish)
+1. **B-001 Animation Fix** - Must be done first, everything visual depends on this
+2. **B-002 Memory Leak** - Important for production stability
+
+### Priority 2: Sound System (High User Impact)
+3. **SoundSystem Upgrade** - Add Web Audio file loading
+4. **Boss Music Integration** - Play music on boss spawn
+
+### Priority 3: Pedalboard UI/Logic (Core Feature Completion)
+5. **Character Model Prep** - Update CharacterRegistry with GLB paths
+6. **Player Loadout Refinement** - Ensure custom loadouts work correctly
+7. **Player Animation Sync** - Implement animation state machine
+
+### Priority 4: Polish (Final Touch)
+8. **B-003 Collision Fix** - Minor gameplay improvement
+9. **UI Tooltips** - Optional but nice quality of life
+
+---
+
+## V. Detailed Implementation Plan
+
+### Phase 1: Critical Fixes (Estimated: High Priority)
+
+#### Task 1.1: Fix Enemy Animation De-sync (B-001)
+
+**Files:** `js/entities/Enemy.js`
+
+**Implementation Steps:**
+1. Add animation state tracking properties:
+   ```javascript
+   this.animState = 'idle';
+   this.animMixer = null;
+   this.animActions = {};
+   ```
+
+2. In constructor, after model loads:
+   ```javascript
+   if (gltf.animations && gltf.animations.length > 0) {
+       this.animMixer = new THREE.AnimationMixer(this.mesh);
+       gltf.animations.forEach(clip => {
+           this.animActions[clip.name.toLowerCase()] =
+               this.animMixer.clipAction(clip);
+       });
+   }
+   ```
+
+3. Add `setAnimation(name)` method:
+   ```javascript
+   setAnimation(name) {
+       if (this.animState === name || !this.animActions[name]) return;
+       Object.values(this.animActions).forEach(a => a.stop());
+       this.animActions[name].reset().play();
+       this.animState = name;
+   }
+   ```
+
+4. In `update()`, sync animation to state:
+   ```javascript
+   // Determine animation state
+   if (this.attackAction && this.attackAction.status !== 'idle') {
+       this.setAnimation('attack');
+   } else if (this.velocity && this.velocity.length() > 0.1) {
+       this.setAnimation('walk');
+   } else {
+       this.setAnimation('idle');
+   }
+
+   // Update mixer
+   if (this.animMixer) this.animMixer.update(dt);
+   ```
+
+#### Task 1.2: Fix Boss Memory Leak (B-002)
+
+**Files:** `js/entities/Boss.js`
+
+**Implementation Steps:**
+1. Locate `dispose()` method
+2. Add before scene removal:
+   ```javascript
+   if (this.moshRing) {
+       this.moshRing.geometry?.dispose();
+       this.moshRing.material?.dispose();
+       this.game.scene.remove(this.moshRing);
+       this.moshRing = null;
+   }
+   ```
+
+---
+
+### Phase 2: Sound System Upgrade
+
+#### Task 2.1: Add File Loading to SoundSystem
+
+**Files:** `js/core/SoundSystem.js`
+
+**Implementation Steps:**
+1. Add audio context and buffer cache:
+   ```javascript
+   this.audioContext = new (window.AudioContext || window.webkitAudioContext)();
+   this.buffers = {};
+   this.currentMusic = null;
+   ```
+
+2. Implement `load(id, path)` method:
+   ```javascript
+   async load(id, path) {
+       const response = await fetch(path);
+       const arrayBuffer = await response.arrayBuffer();
+       this.buffers[id] = await this.audioContext.decodeAudioData(arrayBuffer);
+   }
+   ```
+
+3. Implement `playMusic(id, loop = true)`:
+   ```javascript
+   playMusic(id, loop = true) {
+       this.stopMusic();
+       const source = this.audioContext.createBufferSource();
+       source.buffer = this.buffers[id];
+       source.loop = loop;
+       source.connect(this.audioContext.destination);
+       source.start(0);
+       this.currentMusic = source;
+   }
+   ```
+
+4. Implement `stopMusic()`:
+   ```javascript
+   stopMusic() {
+       if (this.currentMusic) {
+           this.currentMusic.stop();
+           this.currentMusic = null;
+       }
+   }
+   ```
+
+#### Task 2.2: Integrate Boss Music
+
+**Files:** `js/systems/RaidManager.js`, `js/entities/Boss.js`
+
+**Implementation Steps:**
+1. In `RaidManager.spawnBoss()`:
+   ```javascript
+   if (window.game.soundSystem) {
+       window.game.soundSystem.playMusic('boss_theme');
+   }
+   ```
+
+2. In `Boss.dispose()` or when raid ends:
+   ```javascript
+   if (window.game.soundSystem) {
+       window.game.soundSystem.stopMusic();
+   }
+   ```
+
+---
+
+### Phase 3: Pedalboard UI/Logic Integration
+
+#### Task 3.1: Character Model Preparation
+
+**Files:** `js/data/CharacterRegistry.js`
+
+**Implementation Steps:**
+1. Update each character definition with model info:
+   ```javascript
+   CharacterRegistry.register('wanderer', {
+       name: 'The Wanderer',
+       // ... existing stats ...
+       model: {
+           path: 'models/wanderer.glb',  // or placeholder
+           scale: 1.0,
+           animations: {
+               idle: 'Idle',
+               walk: 'Walk',
+               attack: 'Attack'
+           }
+       }
+   });
+   ```
+
+#### Task 3.2: Player Loadout Refinement
+
+**Files:** `js/entities/Player.js`
+
+**Implementation Steps:**
+1. Review `initLoadout()` method
+2. Ensure it correctly merges base character abilities with custom loadout
+3. Handle edge cases where ability slots are locked/unavailable
+
+#### Task 3.3: Player Animation Sync
+
+**Files:** `js/entities/Player.js`
+
+**Implementation Steps:**
+1. Port the animation state machine from Enemy fix to Player
+2. Sync with pedalboard action states
+3. Handle special cases (dash invincibility frames, etc.)
+
+---
+
+### Phase 4: Polish & Cleanup
+
+#### Task 4.1: Fix Projectile Collision (B-003)
+
+**Files:** `js/entities/Projectile.js`
+
+**Implementation Steps:**
+1. Find collision check code
+2. Replace hardcoded `0.6` with `enemy.radius || 0.6`
+
+#### Task 4.2: Additional Polish (Optional)
+
+- Add UI tooltips for ability icons
+- Improve particle effects
+- Add screen transitions between biomes
+
+---
+
+## VI. Long-Term Roadmap Recommendations
+
+Based on IDEAS.md, here's a prioritized long-term vision:
+
+### Near-Term (Post-MVP)
+1. **Loadout Presets** - Save/load ability configurations
+2. **Ability Slot Unlocks** - Gate mastery slot behind upgrades
+3. **Affinity System Buffs** - Magic/Tech affinity provides passive bonuses
+
+### Medium-Term
+1. **Dynamic World Events** - Mid-run objectives and challenges
+2. **Raid Boss Mechanics** - Unique attack patterns for high-level bosses
+3. **Crafting Basics** - Tech Scraps and Aether Shards resources
+
+### Long-Term (Major Features)
+1. **Aetherspace Map** - Persistent world navigation system
+2. **Mounted Combat** - Vehicle/creature summoning
+3. **Monster Zoo** - Collect enemy abilities for player use
+
+---
+
+## VII. Metrics & Success Criteria
+
+### MVP Completion Criteria
+- [ ] All characters have working animations
+- [ ] No memory leaks in 30+ minute sessions
+- [ ] Boss music plays and stops correctly
+- [ ] All 4 characters playable with distinct loadouts
+- [ ] Raid system stable through Level 3
+
+### Quality Targets
+- Frame Rate: Stable 60fps on mid-range hardware
+- Load Time: <3 seconds to playable state
+- Session Stability: No crashes in 60+ minute sessions
+
+---
+
+## VIII. Conclusion
+
+RiftScape Core is a well-crafted project with solid foundations. The "Punk Rock Coding" philosophy has enabled rapid iteration but has left some technical debt around animation and sound systems.
+
+**Recommended immediate actions:**
+1. Fix B-001 (animation sync) - This is the critical blocker
+2. Fix B-002 (memory leak) - Important for stability
+3. Complete sound system - High impact for player experience
+
+With these fixes in place, the game will be at true MVP quality and ready for expanded content development.
+
+---
+
+*This review was generated based on comprehensive codebase analysis. Implementation estimates should be validated against actual development velocity.*
