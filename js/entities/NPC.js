@@ -50,7 +50,14 @@ class NPC {
     }
     
     dispose() {
-        this.mesh.geometry.dispose();
-        this.mesh.material.dispose();
+        // Dispose mesh and all children (marker)
+        if (this.mesh) {
+            this.mesh.traverse((child) => {
+                if (child.isMesh) {
+                    if (child.geometry) child.geometry.dispose();
+                    if (child.material) child.material.dispose();
+                }
+            });
+        }
     }
 }

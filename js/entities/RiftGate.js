@@ -38,8 +38,15 @@ class RiftGate {
     }
     
     addLabel(text) {
-        if (this.label) this.mesh.remove(this.label);
-        
+        // Dispose old label if exists
+        if (this.label) {
+            this.mesh.remove(this.label);
+            if (this.label.material) {
+                if (this.label.material.map) this.label.material.map.dispose();
+                this.label.material.dispose();
+            }
+        }
+
         const canvas = document.createElement('canvas');
         const ctx = canvas.getContext('2d');
         canvas.width = 512; canvas.height = 64;

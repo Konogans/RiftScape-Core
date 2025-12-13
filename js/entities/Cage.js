@@ -76,4 +76,19 @@ class Cage {
         this.game.spawnParticleBurst(this.mesh.position.x, this.mesh.position.z, this.def.color, 20);
         this.game.screenShake(0.3, 5);
     }
+
+    dispose() {
+        // Dispose all meshes and materials including children (prisoner, label sprite)
+        if (this.mesh) {
+            this.mesh.traverse((child) => {
+                if (child.isMesh || child.isSprite) {
+                    if (child.geometry) child.geometry.dispose();
+                    if (child.material) {
+                        if (child.material.map) child.material.map.dispose();
+                        child.material.dispose();
+                    }
+                }
+            });
+        }
+    }
 }

@@ -129,6 +129,7 @@ class Structure {
     }
     
     dispose() {
+        if (this.flashTimeout) clearTimeout(this.flashTimeout);
         this.mesh.geometry.dispose();
         this.mesh.material.dispose();
 		

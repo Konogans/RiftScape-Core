@@ -465,8 +465,20 @@ class Enemy {
         // Legacy animController fallback
         if (this.animController) this.animController.dispose();
 
-        // Cleanup mesh
-        if (this.mesh.geometry) this.mesh.geometry.dispose();
+        // Cleanup all mesh children (eyes, model parts, etc.)
+        if (this.mesh) {
+            this.mesh.traverse((child) => {
+                if (child.isMesh) {
+                    if (child.geometry) child.geometry.dispose();
+                    if (child.material) {
+                        if (child.material.map) child.material.map.dispose();
+                        child.material.dispose();
+                    }
+                }
+            });
+        }
+
+        // Cleanup cube material (for non-model enemies)
         if (this.material) this.material.dispose();
     }
 }

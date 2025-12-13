@@ -143,17 +143,9 @@ The `riftling_remastered.js` mod handles model loading and basic animations (Idl
 
 ### High Priority
 
-#### B-002: Boss Memory Leak
+#### B-002: Boss Memory Leak ✅ ALREADY FIXED
 **Location:** `js/entities/Boss.js`
-**Impact:** `moshRing` geometry/material not disposed, memory grows over time
-**Fix:** Add explicit disposal in `Boss.dispose()`:
-```javascript
-if (this.moshRing) {
-    if (this.moshRing.geometry) this.moshRing.geometry.dispose();
-    if (this.moshRing.material) this.moshRing.material.dispose();
-    this.game.scene.remove(this.moshRing);
-}
-```
+**Status:** Already properly implemented - `dispose()` method handles moshRing cleanup
 
 ### Low Priority
 
