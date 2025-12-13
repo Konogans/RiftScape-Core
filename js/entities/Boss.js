@@ -80,6 +80,16 @@ class Boss extends Enemy {
             if (result.inRange && this.attackCooldown <= 0) {
                 this.attackAction.trigger();
                 this.attackCooldown = 2000;
+
+                // Boss explicitly damages RiftGate if in melee range
+                const gate = this.game.riftGate;
+                if (gate && !gate.dead) {
+                    const distToGate = this.mesh.position.distanceTo(gate.mesh.position);
+                    const gateReach = this.attackRange + gate.radius + 0.5;
+                    if (distToGate < gateReach) {
+                        gate.takeDamage(this.damage);
+                    }
+                }
             }
             
         } else if (this.state === 'charge') {
@@ -144,7 +154,16 @@ class Boss extends Enemy {
                     s.takeDamage(10); // Smash the wall
                 }
             }
-            
+
+            // Check if we hit the RiftGate
+            const gate = this.game.riftGate;
+            if (gate && !gate.dead) {
+                const gateDist = this.mesh.position.distanceTo(gate.mesh.position);
+                if (gateDist < gate.radius + 1.5) {
+                    gate.takeDamage(15); // Charge into gate
+                }
+            }
+
             // End Charge
             this.state = 'recover';
             this.stateTimer = 1.5;

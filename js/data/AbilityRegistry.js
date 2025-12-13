@@ -391,6 +391,13 @@ AbilityRegistry.register('wrench', {
                 if (s.health < s.def.health) {
                     s.health = Math.min(s.health + 10, s.def.health);
                     game.spawnFloatingText(s.x, s.z, "REPAIR", 0x00ff00, 0.5);
+                    // Update health bar visual
+                    if (s.barContainer && s.barFg) {
+                        const ratio = s.health / s.def.health;
+                        s.barFg.scale.x = ratio;
+                        s.barFg.material.color.setHex(ratio < 0.3 ? 0xff0000 : 0x00ffaa);
+                        s.barContainer.visible = ratio < 1.0; // Hide when full
+                    }
                 }
             }
         }
