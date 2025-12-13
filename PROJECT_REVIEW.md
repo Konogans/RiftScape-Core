@@ -19,7 +19,7 @@ RiftScape Core is a **well-architected browser-based action RPG** built on vanil
 | Enemy AI & Behavior | Complete | 8/10 |
 | World Generation | Complete | 9/10 |
 | Meta-Progression | Complete | 9/10 |
-| Animation System | Incomplete | 5/10 |
+| Animation System | Implemented (Option A) | 8/10 |
 | Sound System | Partial | 6/10 |
 | Visual Polish | Needs Work | 6/10 |
 
@@ -94,9 +94,10 @@ The codebase consistently follows the project's stated patterns:
 
 ### Critical Priority
 
-#### B-001: Animation De-sync in Enemy.js
+#### B-001: Animation De-sync in Enemy.js ✅ FIXED
 **Location:** `js/entities/Enemy.js`, `js/systems/AttackSystem.js`
 **Impact:** Attack animations don't sync with actual damage timing
+**Status:** Implemented Option A - Animation speed synced to AttackSystem timing
 
 **Root Cause Analysis:**
 

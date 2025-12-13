@@ -147,7 +147,6 @@ class Enemy {
                             const timeScale = clip.duration / totalAttackDuration;
                             this.attackTimeScale = timeScale; // Store for re-application after reset()
                             action.setEffectiveTimeScale(timeScale);
-                            console.log(`[Enemy] Attack animation: clip=${clip.duration.toFixed(2)}s, target=${totalAttackDuration.toFixed(2)}s, timeScale=${timeScale.toFixed(2)}`);
                         }
                     }
 
@@ -231,12 +230,12 @@ class Enemy {
 
         // Hit flash - handle both cube and model materials
         if (this.hasModel && this.modelMaterials) {
-            // Flash all model materials white
+            // Flash all model materials - use high emissive for glow effect
             for (const entry of this.modelMaterials) {
                 const mat = entry.material;
                 if (mat.color) mat.color.setHex(0xffffff);
                 if (mat.emissive) mat.emissive.setHex(0xffffff);
-                mat.emissiveIntensity = 1.0;
+                mat.emissiveIntensity = 2.5; // High intensity for visible glow
             }
         } else if (this.material) {
             // Flash cube material
@@ -245,7 +244,7 @@ class Enemy {
             this.material.emissiveIntensity = 1.0;
         }
 
-        this.flashTimer = 0.08;
+        this.flashTimer = 0.12; // Slightly longer flash for visibility
 
         // Floating damage text
         if (this.game.spawnFloatingText) {
