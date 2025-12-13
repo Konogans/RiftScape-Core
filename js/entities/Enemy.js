@@ -145,6 +145,7 @@ class Enemy {
                             const t = this.def.attackTiming;
                             const totalAttackDuration = (t.windup + t.action + t.cooldown) / 1000; // seconds
                             const timeScale = clip.duration / totalAttackDuration;
+                            this.attackTimeScale = timeScale; // Store for re-application after reset()
                             action.setEffectiveTimeScale(timeScale);
                             console.log(`[Enemy] Attack animation: clip=${clip.duration.toFixed(2)}s, target=${totalAttackDuration.toFixed(2)}s, timeScale=${timeScale.toFixed(2)}`);
                         }
@@ -194,6 +195,11 @@ class Enemy {
         } else {
             newAction.reset();
             newAction.play();
+        }
+
+        // Re-apply attack animation timeScale after reset() clears it
+        if (name.includes('Attack') && this.attackTimeScale) {
+            newAction.setEffectiveTimeScale(this.attackTimeScale);
         }
 
         this.currentAnim = name;
