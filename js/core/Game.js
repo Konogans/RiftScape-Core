@@ -10,6 +10,8 @@ class Game {
 		this.structures = [];
 		this.floatingTexts = [];
 		this.sound = new SoundSystem();
+        // Preload music tracks
+        this.sound.loadMusic('boss', 'sounds/tracks/00 - KERNEL PANIC AT THE GATES OF DAWN.mp3');
         this.clock = new THREE.Clock();
         this.debug = document.getElementById('debug');
         

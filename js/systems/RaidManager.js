@@ -44,7 +44,10 @@ class RaidManager {
         this.wave = 1;
         this.timer = 5.0;
         this.raidLevel = 1;
-        
+
+        // Stop any playing music
+        if (this.game.sound) this.game.sound.stopMusic();
+
         if (this.game.hud) {
             this.game.hud.updateRaid(false);
             this.game.hud.updateBoss(false);
@@ -85,9 +88,10 @@ class RaidManager {
             
             // Wait for boss death...
             return; 
-        } else {
-            // Clear Boss Bar if dead/null
+        } else if (this.game.currentBoss) {
+            // Boss just died - stop music and clear boss state
             if (this.game.hud) this.game.hud.updateBoss(false);
+            this.game.sound.stopMusic();
             this.game.currentBoss = null;
         }
         
@@ -211,8 +215,11 @@ class RaidManager {
             this.game.scene.add(boss.mesh);
             
             this.game.currentBoss = boss;
+
+            // Start boss music
+            this.game.sound.playMusic('boss');
         } else {
-            this.spawnWave(); 
+            this.spawnWave();
         }
     }
 
