@@ -228,6 +228,9 @@ class Enemy {
         if (this.dead) return;
         this.health.delta(-amount);
 
+        // Skip flash if this hit killed us (onDeath already triggered)
+        if (this.dead) return;
+
         // Hit flash - quick pure-white pulse for both cube and model
         if (this.hasModel && this.modelMaterials) {
             for (const entry of this.modelMaterials) {
