@@ -323,8 +323,10 @@ class Enemy {
 
         if (this.attackCooldown > 0) this.attackCooldown -= deltaTime * 1000;
 
-        // FIX 3: Stop moving when attacking
-        const isAttacking = this.attackAction.status === 'windup' || this.attackAction.status === 'action';
+        // FIX 3: Stop moving when attacking (include cooldown so animation finishes)
+        const isAttacking = this.attackAction.status === 'windup' ||
+                           this.attackAction.status === 'action' ||
+                           this.attackAction.status === 'cooldown';
 
         if (!isAttacking) {
              // Only move if we aren't busy swinging
