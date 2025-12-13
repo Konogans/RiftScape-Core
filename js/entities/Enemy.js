@@ -228,23 +228,21 @@ class Enemy {
         if (this.dead) return;
         this.health.delta(-amount);
 
-        // Hit flash - handle both cube and model materials
+        // Hit flash - quick pure-white pulse for both cube and model
         if (this.hasModel && this.modelMaterials) {
-            // Flash all model materials - use high emissive for glow effect
             for (const entry of this.modelMaterials) {
                 const mat = entry.material;
                 if (mat.color) mat.color.setHex(0xffffff);
                 if (mat.emissive) mat.emissive.setHex(0xffffff);
-                mat.emissiveIntensity = 2.5; // High intensity for visible glow
+                mat.emissiveIntensity = 5.0;
             }
         } else if (this.material) {
-            // Flash cube material
             this.material.color.setHex(0xffffff);
             this.material.emissive.setHex(0xffffff);
             this.material.emissiveIntensity = 1.0;
         }
 
-        this.flashTimer = 0.12; // Slightly longer flash for visibility
+        this.flashTimer = 0.05; // Quick pulse
 
         // Floating damage text
         if (this.game.spawnFloatingText) {
@@ -260,6 +258,21 @@ class Enemy {
     onDeath() {
         if (this.dead) return;
         this.dead = true;
+
+        // Clear any active flash - restore original materials
+        this.flashTimer = 0;
+        if (this.hasModel && this.modelMaterials) {
+            for (const entry of this.modelMaterials) {
+                const mat = entry.material;
+                if (mat.color && entry.color !== null) mat.color.setHex(entry.color);
+                if (mat.emissive && entry.emissive !== null) mat.emissive.setHex(entry.emissive);
+                mat.emissiveIntensity = entry.emissiveIntensity;
+            }
+        } else if (this.material) {
+            this.material.color.setHex(this.def.color);
+            this.material.emissive.setHex(this.def.emissive);
+            this.material.emissiveIntensity = 0.3;
+        }
 
         this.game.addKill();
 
