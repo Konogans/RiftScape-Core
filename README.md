@@ -1,7 +1,3 @@
------
-
-# `README.md`
-
 # 🎸 RiftScape Core Engine
 
 A vanilla JavaScript, browser-based, **"Punk Rock Coding"** engine built on THREE.js (r147). RiftScape is a fast-paced, grid-based action RPG that also shares a blend of survival and survivor elements.
