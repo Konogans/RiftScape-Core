@@ -95,13 +95,50 @@ The codebase consistently follows the project's stated patterns:
 ### Critical Priority
 
 #### B-001: Animation De-sync in Enemy.js
-**Location:** `js/entities/Enemy.js`
-**Impact:** Enemies don't play correct animations (attack/walk/idle)
-**Root Cause:** Animation logic scattered between core and mods; no consistent state machine
-**Fix Approach:**
-1. Remove animation logic from `mods/` directory
-2. Implement animation state machine directly in `Enemy.update()`
-3. Sync animation state with `attackAction.status` and movement velocity
+**Location:** `js/entities/Enemy.js`, `js/systems/AttackSystem.js`
+**Impact:** Attack animations don't sync with actual damage timing
+
+**Root Cause Analysis:**
+
+There are **two separate timing systems** that don't communicate:
+
+| System | Timing Source | When Damage Occurs |
+|--------|---------------|-------------------|
+| `AttackSystem.js` | `Action` class (`windupTime`, `actionTime`) | At fixed ms after trigger (e.g., 200-350ms) |
+| Animation (GLB) | Clip duration | Visual hit at 50-75% of clip (e.g., 500-750ms for 1s clip) |
+
+The `riftling_remastered.js` mod handles model loading and basic animations (Idle/Walk/Run) correctly, but its attack hit detection is a **placeholder** that logs but doesn't integrate with `AttackSystem.onAction()`.
+
+**Current Flow (Broken):**
+```
+1. attackAction.trigger() called
+2. Action enters 'windup' phase (e.g., 200ms)
+3. Action enters 'action' phase → AttackSystem.onAction() deals damage
+4. Meanwhile, animation plays independently at its own speed
+5. Visual "hit" moment doesn't match gameplay damage moment
+```
+
+**Fix Approach Options:**
+
+**Option A: Sync Animation Speed to Action Timing**
+- Calculate animation playback rate: `animSpeed = clipDuration / (windupTime + actionTime)`
+- Force animation to complete its hit frame when `onAction()` fires
+- Pros: Keeps AttackSystem as source of truth
+- Cons: Animations may look sped up or slowed down
+
+**Option B: Animation-Driven Damage (Mod Approach)**
+- Use animation percentage (50-75%) to trigger damage
+- Replace `AttackSystem.onAction()` timing with animation callbacks
+- Pros: Visual and gameplay always match
+- Cons: Requires significant refactor of AttackSystem
+
+**Option C: Animation Events / Notifies**
+- Add "hit" event markers in GLB animations (if supported)
+- Fire damage on animation event rather than fixed timing
+- Pros: Industry-standard approach
+- Cons: Requires model re-export with events
+
+**Recommended: Option A** (least disruptive, keeps existing architecture)
 
 ### High Priority
 
@@ -233,9 +270,40 @@ Based on impact and dependencies, here's the recommended priority order:
    ```
 
 **Integration Steps:**
+
+**Step 1: Port Model Loading (from riftling_remastered.js)**
 1. Port the `loadModel` patch logic directly into `Enemy.js` constructor
-2. Add the `playAnim()` method to Enemy prototype
-3. Port the update loop animation logic into `Enemy.update()`
+2. Add the `playAnim()` method with crossFade support
+3. Port Idle/Walk/Run state detection into `Enemy.update()`
+
+**Step 2: Fix Attack Animation Sync (the actual bug)**
+The model loading works, but attack timing is broken. Choose one approach:
+
+*Option A Implementation (Recommended):*
+```javascript
+// In Enemy.js, when attack animation starts:
+if (this.animActions['Attack'] && this.def.attackTiming) {
+    const clip = this.animActions['Attack'].getClip();
+    const targetDuration = (this.def.attackTiming.windup + this.def.attackTiming.action) / 1000;
+    const timeScale = clip.duration / targetDuration;
+    this.animActions['Attack'].setEffectiveTimeScale(timeScale);
+}
+```
+
+*Option B Implementation (Animation-Driven):*
+```javascript
+// Replace AttackSystem timing with animation-percentage-based damage
+// In Enemy.update():
+if (isCurrentlyAttacking && attackAction) {
+    const percent = attackAction.time / attackAction.getClip().duration;
+    if (percent >= 0.50 && percent < 0.75 && !this.hasHitThisAttack) {
+        AttackSystem.patterns[this.def.attack.type].onAction(this, this.game, this.def.attack);
+        this.hasHitThisAttack = true;
+    }
+}
+```
+
+**Step 3: Cleanup**
 4. Remove animation code from `mods/` directory after core integration
 5. Test with Riftling_Clean.glb model
 
