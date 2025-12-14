@@ -202,8 +202,11 @@ class Boss extends Enemy {
             // Use idle for recovery (panting/vulnerable)
             if (animNames.idle) this.playAnim(animNames.idle);
         } else if (this.state === 'chase') {
-            // Check if attacking
-            if (this.attackAction.status === 'windup' || this.attackAction.status === 'action') {
+            // Check if attacking (include cooldown so animation finishes)
+            const isAttacking = this.attackAction.status === 'windup' ||
+                               this.attackAction.status === 'action' ||
+                               this.attackAction.status === 'cooldown';
+            if (isAttacking) {
                 if (animNames.attack) this.playAnim(animNames.attack);
             } else if (this.inRange) {
                 // In range but not attacking - idle
