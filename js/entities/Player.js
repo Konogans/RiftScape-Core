@@ -123,11 +123,16 @@ class Player {
             if (this.indicator) this.indicator.visible = false;
             if (this.attackMesh) this.attackMesh.visible = false;
 
-            // Store materials for flash effects
+            // Store materials for flash effects and reduce shininess
             this.modelMaterials = [];
             model.traverse((child) => {
                 if (child.isMesh && child.material) {
                     const mat = child.material;
+
+                    // Reduce metallic/shiny look
+                    if (mat.metalness !== undefined) mat.metalness = 0.1;
+                    if (mat.roughness !== undefined) mat.roughness = 0.8;
+
                     this.modelMaterials.push({
                         material: mat,
                         color: mat.color ? mat.color.getHex() : null,

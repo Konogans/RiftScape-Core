@@ -106,11 +106,16 @@ class Enemy {
             this.hasModel = true;
             this.baseY = 0;
 
-            // Store original materials for hit flash effect
+            // Store original materials for hit flash effect and reduce shininess
             this.modelMaterials = [];
             this.mesh.traverse((child) => {
                 if (child.isMesh && child.material) {
                     const mat = child.material;
+
+                    // Reduce metallic/shiny look
+                    if (mat.metalness !== undefined) mat.metalness = 0.1;
+                    if (mat.roughness !== undefined) mat.roughness = 0.8;
+
                     this.modelMaterials.push({
                         material: mat,
                         color: mat.color ? mat.color.getHex() : null,
