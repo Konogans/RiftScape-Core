@@ -82,15 +82,36 @@ class Enemy {
         try {
             // Use model cache to avoid re-parsing GLB for each enemy
             if (!Enemy._modelCache) Enemy._modelCache = {};
+            if (!Enemy._modelLoading) Enemy._modelLoading = {};
 
-            let glb = Enemy._modelCache[modelPath];
-            if (!glb) {
-                // First time loading this model - parse and cache
-                const gltfLoader = new THREE.GLTFLoader();
-                glb = await new Promise((resolve, reject) => {
-                    gltfLoader.load(modelPath, resolve, undefined, reject);
-                });
-                Enemy._modelCache[modelPath] = glb;
+            let cached = Enemy._modelCache[modelPath];
+
+            if (!cached) {
+                // Check if another enemy is already loading this model
+                if (Enemy._modelLoading[modelPath]) {
+                    // Wait for the other load to complete
+                    cached = await Enemy._modelLoading[modelPath];
+                } else {
+                    // First time loading - create promise and store it
+                    Enemy._modelLoading[modelPath] = (async () => {
+                        const gltfLoader = new THREE.GLTFLoader();
+                        const glb = await new Promise((resolve, reject) => {
+                            gltfLoader.load(modelPath, resolve, undefined, reject);
+                        });
+
+                        // Store a pristine template scene (never attached to DOM)
+                        // and the animations for reuse
+                        const template = {
+                            scene: glb.scene,
+                            animations: glb.animations
+                        };
+                        Enemy._modelCache[modelPath] = template;
+                        return template;
+                    })();
+
+                    cached = await Enemy._modelLoading[modelPath];
+                    delete Enemy._modelLoading[modelPath];
+                }
             }
 
             const parent = this.mesh.parent;
@@ -103,14 +124,15 @@ class Enemy {
                 if (this.material) this.material.dispose();
             }
 
-            // Clone the cached model for this instance
-            // Use SkeletonUtils if available (for skinned meshes), otherwise basic clone
+            // Clone the cached template for this instance
+            // Use SkeletonUtils for skinned meshes (properly clones skeleton/bones)
             if (THREE.SkeletonUtils) {
-                this.mesh = THREE.SkeletonUtils.clone(glb.scene);
+                this.mesh = THREE.SkeletonUtils.clone(cached.scene);
             } else {
-                this.mesh = glb.scene.clone(true);
+                console.warn('[Enemy] SkeletonUtils not available, model cloning may fail');
+                this.mesh = cached.scene.clone(true);
             }
-            this.glbAnimations = glb.animations; // Store for mixer setup
+            this.glbAnimations = cached.animations; // Store for mixer setup
             this.mesh.position.set(x, 0, z);
             this.mesh.scale.setScalar(scale);
             this.hasModel = true;
@@ -148,7 +170,7 @@ class Enemy {
             else if (this.game.scene) this.game.scene.add(this.mesh);
 
             // Setup animation system (use stored animations from cache)
-            const animations = this.glbAnimations || glb.animations;
+            const animations = this.glbAnimations;
             if (animations && animations.length > 0) {
                 this.mixer = new THREE.AnimationMixer(this.mesh);
                 this.animActions = {};
