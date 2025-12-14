@@ -59,20 +59,32 @@ EntityRegistry.register('brute', {
     scale: 1.4,
     speed: { min: 0.8, max: 1.2 },
     health: { active: 8, reserve: 12 },
-    
+
+    model: {
+        path: 'models/Brute.glb',
+        scale: 1.0,
+        animations: {
+            idle: 'Idle',
+            walk: 'Walk_normal',
+            run: 'Running',
+            attack: 'Attack',
+            death: 'Death'
+        }
+    },
+
     behavior: 'brute',
-    
+
     attack: { type: 'melee', range: 1.5 },
     attackCooldown: 2000,
     attackTiming: { windup: 500, action: 150, cooldown: 500 },
     damage: 2,
-    
+
     loot: {
         essence: { chance: 1.0, min: 3, max: 5 },
         health: { chance: 0.3, value: 2 },
         reserve: { chance: 0.15, value: 1 }
     },
-    
+
     lore: 'A hulking mass of rift-stuff.'
 });
 
