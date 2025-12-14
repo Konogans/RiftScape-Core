@@ -248,21 +248,28 @@ class Player {
                     );
                 }
 
-                // Reduce shininess on weapon too
+                // Reduce shininess on weapon and ensure visibility
                 weapon.traverse((child) => {
-                    if (child.isMesh && child.material) {
-                        // Handle both single materials and material arrays
-                        const materials = Array.isArray(child.material) ? child.material : [child.material];
-                        for (const mat of materials) {
-                            if (mat.metalness !== undefined) mat.metalness = 0.3;
-                            if (mat.roughness !== undefined) mat.roughness = 0.6;
+                    if (child.isMesh) {
+                        child.frustumCulled = false; // Prevent culling when attached to bone
+                        child.castShadow = true;
+                        child.visible = true;
+
+                        if (child.material) {
+                            // Handle both single materials and material arrays
+                            const materials = Array.isArray(child.material) ? child.material : [child.material];
+                            for (const mat of materials) {
+                                if (mat.metalness !== undefined) mat.metalness = 0.3;
+                                if (mat.roughness !== undefined) mat.roughness = 0.6;
+                            }
                         }
                     }
                 });
 
                 targetBone.add(weapon);
+                weapon.updateMatrixWorld(true);
                 this.weapon = weapon;
-                console.log(`[Player] Weapon attached to ${weaponDef.bone}`);
+                console.log(`[Player] Weapon attached to ${weaponDef.bone}`, targetBone);
             } else {
                 console.warn(`[Player] Attachment point '${weaponDef.bone}' not found. Available objects:`);
                 model.traverse((child) => {
