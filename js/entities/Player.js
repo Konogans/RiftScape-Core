@@ -127,18 +127,21 @@ class Player {
             this.modelMaterials = [];
             model.traverse((child) => {
                 if (child.isMesh && child.material) {
-                    const mat = child.material;
+                    // Handle both single materials and material arrays
+                    const materials = Array.isArray(child.material) ? child.material : [child.material];
 
-                    // Reduce metallic/shiny look
-                    if (mat.metalness !== undefined) mat.metalness = 0.1;
-                    if (mat.roughness !== undefined) mat.roughness = 0.8;
+                    for (const mat of materials) {
+                        // Reduce metallic/shiny look
+                        if (mat.metalness !== undefined) mat.metalness = 0.1;
+                        if (mat.roughness !== undefined) mat.roughness = 0.8;
 
-                    this.modelMaterials.push({
-                        material: mat,
-                        color: mat.color ? mat.color.getHex() : null,
-                        emissive: mat.emissive ? mat.emissive.getHex() : null,
-                        emissiveIntensity: mat.emissiveIntensity || 0
-                    });
+                        this.modelMaterials.push({
+                            material: mat,
+                            color: mat.color ? mat.color.getHex() : null,
+                            emissive: mat.emissive ? mat.emissive.getHex() : null,
+                            emissiveIntensity: mat.emissiveIntensity || 0
+                        });
+                    }
                     child.castShadow = true;
                 }
             });
@@ -235,8 +238,12 @@ class Player {
                 // Reduce shininess on weapon too
                 weapon.traverse((child) => {
                     if (child.isMesh && child.material) {
-                        if (child.material.metalness !== undefined) child.material.metalness = 0.3;
-                        if (child.material.roughness !== undefined) child.material.roughness = 0.6;
+                        // Handle both single materials and material arrays
+                        const materials = Array.isArray(child.material) ? child.material : [child.material];
+                        for (const mat of materials) {
+                            if (mat.metalness !== undefined) mat.metalness = 0.3;
+                            if (mat.roughness !== undefined) mat.roughness = 0.6;
+                        }
                     }
                 });
 
