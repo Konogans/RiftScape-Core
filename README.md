@@ -92,11 +92,25 @@ For detailed status information, please consult the `STATUS.md` file.
 
 ## 🤝 Contribution
 
-Contributions may eventually be accepted, provided they strictly adhere to the **"Punk Rock Coding"** philosophy, and the project's creative vision.
+Contributions are welcome! This project follows the **"Punk Rock Coding"** philosophy—prioritizing velocity and creative flow over architectural purity.
+
+### Guidelines
 
   * **Do Not** introduce external dependencies, build tools, or transpilers.
   * **Use** the `ModManager.patch()` utility for minimal, surgical changes to existing class functionality.
   * **Register** new content (enemies, abilities) directly into the relevant `js/data/*Registry.js` file.
+  * **Follow** the Registry Pattern—separate data from logic.
+  * **Maintain** the global state pattern (`window.Game`, `window.WorldState`).
+
+### For AI Contributors
+
+See `AI_CONTRIBUTOR.md` for detailed style guidelines and architecture patterns.
+
+### How to Contribute
+
+1. Fork the repository
+2. Make your changes following the guidelines above
+3. Submit a pull request with a clear description
 
 *Thank you for contributing to the RiftScape Engine.*
 
