@@ -363,6 +363,10 @@ class Game {
 		const equipmentNPC = new NPC(this, -8, 0, "The Armorer", "equipment", 0x88aa88);
 		this.entities.push(equipmentNPC); this.scene.add(equipmentNPC.mesh);
 		
+		// Trader (Sell items for essence)
+		const traderNPC = new NPC(this, 0, -5, "The Trader", "trader", 0x88cc88);
+		this.entities.push(traderNPC); this.scene.add(traderNPC.mesh);
+		
 		// The Forgotten (Always there)
 		const resetNPC = new NPC(this, 0, -8, "The Forgotten", "reset", 0x333333);
 		this.entities.push(resetNPC); this.scene.add(resetNPC.mesh);
@@ -465,6 +469,7 @@ class Game {
 			if (unlocked.includes('builder')) targets.push({ x: 0, z: 8, name: "Kael (Architect)" });
 			targets.push({ x: 8, z: 0, name: "The Tinkerer" }); // Always available
 			targets.push({ x: -8, z: 0, name: "The Armorer" }); // Equipment manager
+			targets.push({ x: 0, z: -5, name: "The Trader" }); // Sell items
             
             // Optional: Point to reset NPC if you want
             // targets.push({ x: 0, z: -8, name: "The Forgotten" });

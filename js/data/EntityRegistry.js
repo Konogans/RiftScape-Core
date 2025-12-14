@@ -46,7 +46,12 @@ EntityRegistry.register('default', {
     // LOOT (interpreted by LootSystem or spawn logic)
     loot: {
         essence: { chance: 0.8, min: 1, max: 2 },
-        health: { chance: 0.1, value: 1 }
+        health: { chance: 0.1, value: 1 },
+        // NEW: Rare equipment drops
+        equipment: {
+            chance: 0.02, // 2% chance for rare equipment
+            items: ['battleaxe', 'health_amulet'] // Possible drops
+        }
     },
 
     lore: 'A minor creature drawn through the rifts.'
@@ -82,7 +87,12 @@ EntityRegistry.register('brute', {
     loot: {
         essence: { chance: 1.0, min: 3, max: 5 },
         health: { chance: 0.3, value: 2 },
-        reserve: { chance: 0.15, value: 1 }
+        reserve: { chance: 0.15, value: 1 },
+        // NEW: Rare equipment drops (higher chance for stronger enemies)
+        equipment: {
+            chance: 0.05, // 5% chance
+            items: ['hammer', 'blade', 'speed_boots', 'damage_ring']
+        }
     },
 
     lore: 'A hulking mass of rift-stuff.'

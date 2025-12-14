@@ -404,12 +404,34 @@ class Enemy {
         const x = this.mesh.position.x;
         const z = this.mesh.position.z;
 
+        // Standard loot (essence, health, etc.)
         for (const [type, def] of Object.entries(loot)) {
-            if (Math.random() < def.chance) {
-                const value = def.min !== undefined
+            if (type === 'equipment') continue; // Handle equipment separately
+            if (Math.random() < (def.chance || 1)) {
+                const value = def.min !== undefined && def.max !== undefined
                     ? def.min + Math.floor(Math.random() * (def.max - def.min + 1))
-                    : def.value || 1;
+                    : (def.value || 1);
                 this.game.spawnPickup(x + (Math.random() - 0.5), z + (Math.random() - 0.5), type, value);
+            }
+        }
+        
+        // Equipment drops (rare)
+        if (loot.equipment) {
+            const equipDef = loot.equipment;
+            if (Math.random() < (equipDef.chance || 0.05)) {
+                // Roll for which equipment to drop
+                const equipmentList = equipDef.items || [];
+                if (equipmentList.length > 0) {
+                    const randomEquip = equipmentList[Math.floor(Math.random() * equipmentList.length)];
+                    const equipId = randomEquip.id || randomEquip;
+                    // Add directly to inventory (no pickup needed)
+                    MetaProgression.addToInventory('equipment', equipId, 1);
+                    
+                    // Visual feedback
+                    const equipName = EquipmentRegistry.get(equipId)?.name || 'Item';
+                    this.game.spawnFloatingText(x, z, `+${equipName}`, 0x88ff88);
+                    if (this.game.sound) this.game.sound.play('build'); // Item pickup sound
+                }
             }
         }
     }

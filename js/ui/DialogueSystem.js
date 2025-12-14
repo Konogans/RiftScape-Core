@@ -34,6 +34,7 @@ class DialogueSystem {
 			builder: "The battlefield is a canvas. Build your defenses.",
 			pedalboard: "Customize your loadout. Each slot defines your combat style.",
 			equipment: "Arm yourself. Choose your weapon and trinkets.",
+			trader: "I'll buy your loot. Show me what you've found.",
 			'reset': "To begin again is to lose everything. Are you certain?" // NEW
 		};
 		return greetings[role] || "Greetings.";
@@ -52,6 +53,12 @@ class DialogueSystem {
         // EQUIPMENT UI for Equipment Manager
         if (npc.role === 'equipment') {
             this.updateEquipment(npc);
+            return;
+        }
+        
+        // TRADER UI for selling items
+        if (npc.role === 'trader') {
+            this.updateTrader(npc);
             return;
         }
         

@@ -161,7 +161,9 @@ const MetaProgression = {
         equipment: {
             weapon: null,      // Equipped weapon ID
             trinkets: [null, null, null] // Equipped trinket IDs (3 slots)
-        }
+        },
+        // NEW: Inventory (dropped items that can be sold)
+        inventory: [] // Array of { type: 'equipment', id: 'battleaxe', count: 1 }
     },
     save() {
         try { localStorage.setItem('riftscape_meta', JSON.stringify(this.data)); } 
@@ -193,7 +195,8 @@ const MetaProgression = {
             equipment: {
                 weapon: null,
                 trinkets: [null, null, null]
-            }
+            },
+            inventory: []
         };
         this.save();
     },
