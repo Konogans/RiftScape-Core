@@ -59,12 +59,21 @@ class Player {
         const loadoutDef = customLoadout || this.charDef.loadout || {};
         const slots = ['primary', 'secondary', 'mobility', 'utility', 'mastery'];
         
+        // Get equipped weapon for validation
+        const equippedWeaponId = MetaProgression.data.equipment?.weapon || null;
+        
         slots.forEach(slot => {
             const abilityId = loadoutDef[slot];
             if (!abilityId) return;
             
             const def = AbilityRegistry.get(abilityId);
             if (!def) return;
+            
+            // NEW: Validate ability against character and weapon restrictions
+            if (!EquipmentValidator.canUseAbility(abilityId, charId, equippedWeaponId)) {
+                console.warn(`[Player] Ability ${abilityId} is not valid for character ${charId} with weapon ${equippedWeaponId}, skipping.`);
+                return; // Skip invalid abilities
+            }
             
             const speedMod = (this.mods.attackSpeed||0) + (this.charDef.stats.attackSpeed||0);
             const speedMult = 1 / (1 + speedMod);

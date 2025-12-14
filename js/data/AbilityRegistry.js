@@ -12,6 +12,7 @@ AbilityRegistry.register('swipe', {
     name: 'Rusty Blade',
     description: 'Standard melee swipe.',
     type: 'primary',
+    requiresWeaponType: 'melee', // NEW: Requires melee weapon
     timing: { windup: 200, action: 150, cooldown: 350 },
     onWindup: (p) => { 
         p.attackMesh.material.opacity = 0.3; 
@@ -33,6 +34,7 @@ AbilityRegistry.register('shotgun', {
     name: 'Shrapnel Cannon',
     description: 'Close range burst.',
     type: 'primary',
+    requiresWeaponType: 'ranged', // NEW: Requires ranged weapon
     timing: { windup: 300, action: 100, cooldown: 800 },
     onWindup: (p) => { p.baseMaterial.emissiveIntensity = 1.0; },
     onAction: (p, game) => {
@@ -60,6 +62,7 @@ AbilityRegistry.register('bolt', {
     name: 'Aether Bolt',
     description: 'Homing magic missile.',
     type: 'primary',
+    requiresWeaponType: 'magic', // NEW: Requires magic weapon
     timing: { windup: 50, action: 100, cooldown: 200 },
     onWindup: (p) => { p.baseMaterial.emissiveIntensity = 0.8; },
     onAction: (p, game) => {
@@ -128,6 +131,7 @@ AbilityRegistry.register('slam', {
 });
 
 AbilityRegistry.register('snipe', {
+    requiresWeaponType: 'ranged', // NEW: Requires ranged weapon
     name: 'Power Shot',
     description: 'High damage, long range.',
     type: 'secondary',
@@ -365,6 +369,7 @@ AbilityRegistry.register('turret', {
 
 // --- PRIMARY: Wrench (Melee + Repair) ---
 AbilityRegistry.register('wrench', {
+    requiresWeaponType: 'melee', // NEW: Requires melee weapon (tool)
     name: 'Omni-Wrench',
     description: 'Smash enemies, repair structures.',
     type: 'primary',

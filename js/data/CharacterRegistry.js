@@ -12,6 +12,9 @@ CharacterRegistry.register('wanderer', {
     description: 'Balanced survivalist.',
     color: 0x44aaff,
     stats: { moveSpeed: 0, maxHealth: 0, maxReserve: 0, attackDamage: 0, attackSpeed: 0 },
+    // NEW: Character restrictions
+    allowedWeaponTypes: ['melee'], // Can only use melee weapons
+    allowedAbilities: null, // null = no restrictions (can use all abilities)
     model: {
         path: 'models/Wanderer.glb',
         scale: 1.0,
@@ -48,6 +51,9 @@ CharacterRegistry.register('smith', {
     description: 'Heavy armor. Shotgun.',
     color: 0xaa4444,
     stats: { moveSpeed: -0.15, maxHealth: 5, maxReserve: 5, attackDamage: 1, attackSpeed: -0.3 },
+    // NEW: Character restrictions
+    allowedWeaponTypes: ['ranged'], // Can only use ranged weapons
+    allowedAbilities: ['shotgun', 'slam', 'dash', 'turret'], // Restricted ability list
     loadout: {
         primary: 'shotgun',
         secondary: 'slam',
@@ -63,6 +69,9 @@ CharacterRegistry.register('scribe', {
     description: 'Glass cannon. Homing bolts.',
     color: 0x8844ff,
     stats: { moveSpeed: 0.2, maxHealth: -2, maxReserve: -2, attackDamage: 0, attackSpeed: 0.3 },
+    // NEW: Character restrictions
+    allowedWeaponTypes: ['magic'], // Can only use magic weapons
+    allowedAbilities: ['bolt', 'snipe', 'dash', 'heal'], // Restricted ability list
     loadout: {
         primary: 'bolt',
         secondary: 'snipe',
@@ -77,6 +86,9 @@ CharacterRegistry.register('builder', {
     description: 'Controls the battlefield.',
     color: 0xffaa00, // Orange
     stats: { moveSpeed: 0, maxHealth: 2, maxReserve: 5, attackDamage: 0, attackSpeed: 0 },
+    // NEW: Character restrictions
+    allowedWeaponTypes: ['melee'], // Can only use melee weapons (tools)
+    allowedAbilities: ['wrench', 'turret', 'dash', 'wall', 'dismantle'], // Restricted ability list
     loadout: {
         primary: 'wrench',
         secondary: 'turret',

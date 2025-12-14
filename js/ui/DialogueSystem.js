@@ -332,9 +332,10 @@ class DialogueSystem {
             { id: 'mastery', label: 'Mastery', required: false }
         ];
         
-        // Get available abilities by type
+        // Get available abilities by type (filtered by restrictions)
+        const equippedWeaponId = MetaProgression.data.equipment?.weapon || null;
         const getAbilitiesByType = (type) => {
-            return AbilityRegistry.list().filter(a => a.type === type);
+            return EquipmentValidator.getValidAbilities(charId, equippedWeaponId, type);
         };
         
         slots.forEach(slot => {
@@ -370,9 +371,19 @@ class DialogueSystem {
                     if (currentAbilityId === ability.id) {
                         btn.classList.add('selected');
                     }
+                    
+                    // Check if ability is valid (may have become invalid due to weapon change)
+                    const isValid = EquipmentValidator.canUseAbility(ability.id, charId, equippedWeaponId);
+                    if (!isValid) {
+                        btn.classList.add('disabled');
+                        btn.title = `${ability.description || ''} (Requires ${ability.requiresWeaponType || 'specific'} weapon)`;
+                    } else {
+                        btn.title = ability.description || '';
+                    }
+                    
                     btn.textContent = ability.name;
-                    btn.title = ability.description || '';
                     btn.onclick = () => {
+                        if (!isValid) return; // Don't allow selection of invalid abilities
                         // Save to custom loadout
                         if (!MetaProgression.data.customLoadouts) {
                             MetaProgression.data.customLoadouts = {};
@@ -450,6 +461,7 @@ class DialogueSystem {
     updateEquipment(npc) {
         this.optionsEl.innerHTML = ''; // Clear to prevent duplication
         
+        const charId = MetaProgression.data.currentCharacter;
         const equipment = MetaProgression.data.equipment || { weapon: null, trinkets: [null, null, null] };
         
         // WEAPON SLOT
@@ -481,19 +493,30 @@ class DialogueSystem {
         }
         weaponSlotDiv.appendChild(currentWeaponDiv);
         
-        // Weapon selection
+        // Weapon selection (filtered by character restrictions)
         const weaponSelectDiv = document.createElement('div');
         weaponSelectDiv.className = 'ability-select';
         
-        EquipmentRegistry.getByType('weapon').forEach(weapon => {
+        const validWeapons = EquipmentValidator.getValidWeapons(charId);
+        validWeapons.forEach(weapon => {
             const btn = document.createElement('button');
             btn.className = 'ability-btn';
             if (currentWeaponId === weapon.id) {
                 btn.classList.add('selected');
             }
+            
+            // Check if weapon is valid for character
+            const isValid = EquipmentValidator.canEquipWeapon(weapon.id, charId);
+            if (!isValid) {
+                btn.classList.add('disabled');
+                btn.title = `${weapon.description || ''} (Not allowed for this character)`;
+            } else {
+                btn.title = weapon.description || '';
+            }
+            
             btn.textContent = weapon.name;
-            btn.title = weapon.description || '';
             btn.onclick = () => {
+                if (!isValid) return; // Don't allow selection of invalid weapons
                 MetaProgression.equipWeapon(weapon.id);
                 this.updateEquipment(npc);
                 if (this.game.player && this.game.inOutpost) {

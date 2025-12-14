@@ -40,6 +40,7 @@ const EquipmentRegistry = {
 EquipmentRegistry.register('battleaxe', {
     name: 'Magitech Battleaxe',
     type: 'weapon',
+    weaponType: 'melee', // NEW: Weapon type category
     description: 'A balanced melee weapon with good reach.',
     model: {
         path: 'models/Magitech_Battleaxe.glb',
@@ -59,6 +60,7 @@ EquipmentRegistry.register('battleaxe', {
 EquipmentRegistry.register('hammer', {
     name: 'Iron Hammer',
     type: 'weapon',
+    weaponType: 'melee', // NEW: Weapon type category
     description: 'A heavy weapon that hits hard but swings slow.',
     model: {
         path: 'models/Magitech_Battleaxe.glb', // TODO: Replace with hammer model
@@ -78,6 +80,7 @@ EquipmentRegistry.register('hammer', {
 EquipmentRegistry.register('blade', {
     name: 'Swift Blade',
     type: 'weapon',
+    weaponType: 'melee', // NEW: Weapon type category
     description: 'A fast weapon that strikes quickly.',
     model: {
         path: 'models/Magitech_Battleaxe.glb', // TODO: Replace with blade model
@@ -90,6 +93,46 @@ EquipmentRegistry.register('blade', {
         attackDamage: -1,     // -1 base damage
         attackSpeed: 0.3,     // +30% attack speed
         attackRange: -0.1     // -0.1 range
+    }
+});
+
+// 4. Hunter's Bow (Ranged weapon)
+EquipmentRegistry.register('bow', {
+    name: "Hunter's Bow",
+    type: 'weapon',
+    weaponType: 'ranged', // NEW: Weapon type category
+    description: 'A ranged weapon for precision strikes.',
+    model: {
+        path: 'models/Magitech_Battleaxe.glb', // TODO: Replace with bow model
+        bone: 'RightHand',
+        scale: 0.5,
+        position: { x: 0.0, y: 0.1, z: -0.2 },
+        rotation: { x: 0, y: -0.5, z: 1.5 }
+    },
+    stats: {
+        attackDamage: 0,      // +0 base damage
+        attackSpeed: 0.1,     // +10% attack speed
+        attackRange: 0.5      // +0.5 range
+    }
+});
+
+// 5. Aether Staff (Magic weapon)
+EquipmentRegistry.register('staff', {
+    name: 'Aether Staff',
+    type: 'weapon',
+    weaponType: 'magic', // NEW: Weapon type category
+    description: 'A magical focus for casting spells.',
+    model: {
+        path: 'models/Magitech_Battleaxe.glb', // TODO: Replace with staff model
+        bone: 'RightHand',
+        scale: 0.5,
+        position: { x: 0.0, y: 0.1, z: -0.2 },
+        rotation: { x: 0, y: -0.5, z: 1.5 }
+    },
+    stats: {
+        attackDamage: 0,      // +0 base damage
+        attackSpeed: 0.2,     // +20% attack speed
+        attackRange: 0.3      // +0.3 range
     }
 });
 
