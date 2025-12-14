@@ -37,9 +37,29 @@ class Chunk {
     }
 
     generateWildernessChunk(worldX, worldZ, biome) {
+        // Create floor material - use texture if available
+        let floorMat;
+        if (biome.groundTexture) {
+            const texture = new THREE.TextureLoader().load(biome.groundTexture);
+            texture.wrapS = THREE.RepeatWrapping;
+            texture.wrapT = THREE.RepeatWrapping;
+            texture.repeat.set(biome.groundTextureRepeat || 4, biome.groundTextureRepeat || 4);
+            floorMat = PSXify(new THREE.MeshStandardMaterial({
+                map: texture,
+                roughness: 0.9,
+                metalness: 0.1
+            }));
+        } else {
+            floorMat = PSXify(new THREE.MeshStandardMaterial({
+                color: biome.groundColor,
+                roughness: 0.9,
+                metalness: 0.1
+            }));
+        }
+
         const floor = new THREE.Mesh(
             new THREE.PlaneGeometry(this.size, this.size),
-            PSXify(new THREE.MeshStandardMaterial({ color: biome.groundColor, roughness: 0.9, metalness: 0.1 }))
+            floorMat
         );
         floor.rotateX(-Math.PI / 2);
         floor.position.set(worldX, -0.01, worldZ);

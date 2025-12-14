@@ -27,7 +27,9 @@ BiomeRegistry.register('void_cathedral', {
 });
 BiomeRegistry.register('sanctuary', {
     name: 'The Outpost',
-    groundColor: 0x224422, // Grass-ish
+    groundColor: 0x224422, // Fallback color
+    groundTexture: 'images/tex_garrisoned_earth.jpg', // Seamless ground texture
+    groundTextureRepeat: 4, // Repeat per chunk
     fogColor: 0x88ccff,    // Blue sky
     fogDensity: 0.005,     // Very clear view
     ambientColor: 0x8888aa, // Bright ambient light
