@@ -114,6 +114,7 @@ class Player {
             const model = glb.scene;
             model.scale.setScalar(modelDef.scale || 1.0);
             model.position.y = -0.5; // Adjust for mesh.position.y = 0.5
+            model.rotation.y = Math.PI; // Face forward (model exported backward)
             this.mesh.add(model);
             this.modelRoot = model;
             this.hasModel = true;
@@ -148,6 +149,24 @@ class Player {
                     if (oneShotAnims.includes(clip.name)) {
                         action.setLoop(THREE.LoopOnce, 0);
                         action.clampWhenFinished = true;
+                    }
+
+                    // Sync attack animation to primary ability timing
+                    if (clip.name === animNames.attack && this.actions.primary) {
+                        const timing = this.actions.primary.def.timing;
+                        const totalDuration = (timing.windup + timing.action) / 1000;
+                        const timeScale = clip.duration / totalDuration;
+                        action.setEffectiveTimeScale(timeScale);
+                        this.attackTimeScale = timeScale;
+                    }
+
+                    // Sync slam animation to secondary ability timing
+                    if (clip.name === animNames.slam && this.actions.secondary) {
+                        const timing = this.actions.secondary.def.timing;
+                        const totalDuration = (timing.windup + timing.action) / 1000;
+                        const timeScale = clip.duration / totalDuration;
+                        action.setEffectiveTimeScale(timeScale);
+                        this.slamTimeScale = timeScale;
                     }
                 });
 
@@ -715,7 +734,7 @@ class Player {
         }
 
         // Slam animation (secondary in windup or action, if it's the slam ability)
-        if (secondaryAction && secondaryAction.def && secondaryAction.def.name === 'Ground Slam') {
+        if (secondaryAction && secondaryAction.def && secondaryAction.def.name === 'Seismic Slam') {
             if (secondaryAction.status === 'windup' || secondaryAction.status === 'action') {
                 if (animNames.slam) this.playAnim(animNames.slam);
                 return;
