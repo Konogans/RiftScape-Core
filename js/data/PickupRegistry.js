@@ -60,3 +60,30 @@ PickupRegistry.register('damage', {
     scale: 0.18, shape: 'tetrahedron', bobSpeed: 4, bobHeight: 0.12, lifetime: 8, magnetRange: 2, collectRange: 0.5,
     onCollect: (game, pickup) => { game.player.applyBuff('damage', 2, 5); }
 });
+
+// Equipment pickup (value is the equipment ID)
+PickupRegistry.register('equipment', {
+    name: 'Equipment', 
+    color: 0x88ff88, 
+    emissive: 0x44aa44, 
+    emissiveIntensity: 0.9,
+    scale: 0.25, 
+    shape: 'octahedron', 
+    bobSpeed: 2, 
+    bobHeight: 0.15, 
+    lifetime: 20, 
+    magnetRange: 3, 
+    collectRange: 0.5,
+    onCollect: (game, pickup) => {
+        // pickup.value contains the equipment ID
+        const equipmentId = pickup.value;
+        MetaProgression.addToInventory('equipment', equipmentId, 1);
+        
+        // Visual feedback
+        const equipment = EquipmentRegistry.get(equipmentId);
+        if (equipment) {
+            game.spawnFloatingText(pickup.mesh.position.x, pickup.mesh.position.z, `+${equipment.name}`, 0x88ff88);
+        }
+        if (game.sound) game.sound.play('build');
+    }
+});

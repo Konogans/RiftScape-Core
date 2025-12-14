@@ -116,7 +116,12 @@ EntityRegistry.register('swift', {
     
     loot: {
         essence: { chance: 0.6, min: 1, max: 1 },
-        speed: { chance: 0.05, duration: 3 }
+        speed: { chance: 0.05, duration: 3 },
+        // Equipment drops (common trinkets from fast enemies)
+        equipment: {
+            chance: 0.03, // 3% chance
+            items: ['speed_boots', 'health_amulet', 'regen_pendant']
+        }
     },
     
     lore: 'A darting fragment.'
@@ -153,7 +158,12 @@ EntityRegistry.register('spitter', {
     attackTiming: { windup: 600, action: 100, cooldown: 400 },
     
     loot: {
-        essence: { chance: 0.9, min: 2, max: 3 }
+        essence: { chance: 0.9, min: 2, max: 3 },
+        // Equipment drops (ranged weapons and trinkets)
+        equipment: {
+            chance: 0.04, // 4% chance
+            items: ['bow', 'staff', 'damage_ring', 'essence_finder']
+        }
     },
     
     lore: 'Keeps its distance.'
@@ -182,6 +192,16 @@ EntityRegistry.register('berserker', {
     attackTiming: { windup: 200, action: 100, cooldown: 300 },
     damage: 2,
     
+    loot: {
+        essence: { chance: 1.0, min: 2, max: 4 },
+        health: { chance: 0.2, value: 1 },
+        // Equipment drops (melee weapons and aggressive trinkets)
+        equipment: {
+            chance: 0.06, // 6% chance
+            items: ['blade', 'hammer', 'damage_ring', 'defense_charm', 'speed_boots']
+        }
+    },
+    
     lore: 'Driven mad by rift exposure.'
 });
 
@@ -206,6 +226,16 @@ EntityRegistry.register('artillery', {
     attackCooldown: 3500,
     attackTiming: { windup: 800, action: 200, cooldown: 600 },
     
+    loot: {
+        essence: { chance: 1.0, min: 3, max: 5 },
+        reserve: { chance: 0.2, value: 1 },
+        // Equipment drops (ranged/magic weapons and utility trinkets)
+        equipment: {
+            chance: 0.08, // 8% chance (stronger enemy)
+            items: ['bow', 'staff', 'essence_finder', 'regen_pendant', 'defense_charm']
+        }
+    },
+    
     lore: 'Fires in volleys.'
 });
 
@@ -215,16 +245,22 @@ EntityRegistry.register('headliner', {
     emissive: 0xff0000,
     scale: 1.8, // REDUCED (was 2.5)
     speed: { min: 4, max: 4 },
-    health: { active: 300, reserve: 0 }, // BUFFED (was 100)
+    health: { active: 400, reserve: 400 },
     damage: 3,
-    loot: { essence: { chance: 1.0, value: 500 } },
     attackRange: 2.0, // Reduced slightly to match scale
-
-	health: { active: 400, reserve: 400 },
 
     attack: { type: 'melee', range: 2.5 },
     attackCooldown: 2000,
     attackTiming: { windup: 500, action: 200, cooldown: 1000 },
+
+    loot: { 
+        essence: { chance: 1.0, value: 500 },
+        // Boss equipment drops (guaranteed rare equipment)
+        equipment: {
+            chance: 1.0, // 100% chance (boss always drops equipment)
+            items: ['battleaxe', 'hammer', 'blade', 'bow', 'staff', 'health_amulet', 'speed_boots', 'damage_ring', 'regen_pendant', 'essence_finder', 'defense_charm']
+        }
+    },
 
     model: {
         path: 'models/headliner.glb',

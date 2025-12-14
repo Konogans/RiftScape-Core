@@ -500,12 +500,49 @@ class DialogueSystem {
         }
         weaponSlotDiv.appendChild(currentWeaponDiv);
         
-        // Weapon selection (filtered by character restrictions)
+        // Weapon selection (only show inventory items + currently equipped)
         const weaponSelectDiv = document.createElement('div');
         weaponSelectDiv.className = 'ability-select';
         
-        const validWeapons = EquipmentValidator.getValidWeapons(charId);
-        validWeapons.forEach(weapon => {
+        // Get weapons from inventory
+        const inventory = MetaProgression.getInventoryItems();
+        const inventoryWeapons = inventory
+            .filter(item => item.type === 'equipment')
+            .map(item => EquipmentRegistry.get(item.id))
+            .filter(equip => equip && equip.type === 'weapon' && EquipmentValidator.canEquipWeapon(equip.id, charId));
+        
+        // Only show weapons that are in inventory OR currently equipped
+        const allWeapons = [];
+        const seenIds = new Set();
+        
+        // Add currently equipped weapon (if any) so it can be shown/cleared
+        if (currentWeaponId) {
+            const equippedWeapon = EquipmentRegistry.get(currentWeaponId);
+            if (equippedWeapon && EquipmentValidator.canEquipWeapon(equippedWeapon.id, charId)) {
+                const inInventory = MetaProgression.getInventoryCount('equipment', equippedWeapon.id);
+                allWeapons.push({ ...equippedWeapon, fromInventory: inInventory > 0 });
+                seenIds.add(equippedWeapon.id);
+            }
+        }
+        
+        // Add inventory weapons (that aren't already shown as equipped)
+        inventoryWeapons.forEach(weapon => {
+            if (!seenIds.has(weapon.id)) {
+                allWeapons.push({ ...weapon, fromInventory: true });
+                seenIds.add(weapon.id);
+            }
+        });
+        
+        // If no weapons available, show message
+        if (allWeapons.length === 0) {
+            const msg = document.createElement('div');
+            msg.style.color = '#666';
+            msg.style.padding = '10px';
+            msg.textContent = "No weapons available. Find equipment by defeating enemies!";
+            weaponSelectDiv.appendChild(msg);
+        }
+        
+        allWeapons.forEach(weapon => {
             const btn = document.createElement('button');
             btn.className = 'ability-btn';
             if (currentWeaponId === weapon.id) {
@@ -522,8 +559,32 @@ class DialogueSystem {
             }
             
             btn.textContent = weapon.name;
+            if (weapon.fromInventory) {
+                const count = MetaProgression.getInventoryCount('equipment', weapon.id);
+                btn.textContent += ` (x${count})`;
+            }
             btn.onclick = () => {
                 if (!isValid) return; // Don't allow selection of invalid weapons
+                
+                // Don't do anything if already equipped
+                if (currentWeaponId === weapon.id) {
+                    return;
+                }
+                
+                // If from inventory, remove one from inventory when equipping
+                // (But only if it's actually in inventory - equipped items without inventory count don't consume)
+                if (weapon.fromInventory) {
+                    const count = MetaProgression.getInventoryCount('equipment', weapon.id);
+                    if (count > 0) {
+                        MetaProgression.removeFromInventory('equipment', weapon.id, 1);
+                    }
+                }
+                
+                // If there was a previously equipped weapon, add it back to inventory
+                if (currentWeaponId) {
+                    MetaProgression.addToInventory('equipment', currentWeaponId, 1);
+                }
+                
                 MetaProgression.equipWeapon(weapon.id);
                 this.updateEquipment(npc);
                 if (this.game.player && this.game.inOutpost) {
@@ -584,19 +645,70 @@ class DialogueSystem {
             }
             trinketSlotDiv.appendChild(currentTrinketDiv);
             
-            // Trinket selection
+            // Trinket selection (only show inventory items + currently equipped)
             const trinketSelectDiv = document.createElement('div');
             trinketSelectDiv.className = 'ability-select';
             
-            EquipmentRegistry.getByType('trinket').forEach(trinket => {
+            // Get trinkets from inventory
+            const inventoryTrinkets = inventory
+                .filter(item => item.type === 'equipment')
+                .map(item => EquipmentRegistry.get(item.id))
+                .filter(equip => equip && equip.type === 'trinket');
+            
+            // Only show trinkets that are in inventory OR currently equipped
+            const allTrinkets = [];
+            const seenTrinketIds = new Set();
+            
+            // Add currently equipped trinket (if any) so it can be shown/cleared
+            if (currentTrinketId) {
+                const equippedTrinket = EquipmentRegistry.get(currentTrinketId);
+                if (equippedTrinket) {
+                    const inInventory = MetaProgression.getInventoryCount('equipment', equippedTrinket.id);
+                    allTrinkets.push({ ...equippedTrinket, fromInventory: inInventory > 0 });
+                    seenTrinketIds.add(equippedTrinket.id);
+                }
+            }
+            
+            // Add inventory trinkets (that aren't already shown as equipped)
+            inventoryTrinkets.forEach(trinket => {
+                if (!seenTrinketIds.has(trinket.id)) {
+                    allTrinkets.push({ ...trinket, fromInventory: true });
+                    seenTrinketIds.add(trinket.id);
+                }
+            });
+            
+            allTrinkets.forEach(trinket => {
                 const btn = document.createElement('button');
                 btn.className = 'ability-btn';
                 if (currentTrinketId === trinket.id) {
                     btn.classList.add('selected');
                 }
                 btn.textContent = trinket.name;
+                if (trinket.fromInventory) {
+                    const count = MetaProgression.getInventoryCount('equipment', trinket.id);
+                    btn.textContent += ` (x${count})`;
+                }
                 btn.title = trinket.description || '';
                 btn.onclick = () => {
+                    // Don't do anything if already equipped in this slot
+                    if (currentTrinketId === trinket.id) {
+                        return;
+                    }
+                    
+                    // If from inventory, remove one from inventory when equipping
+                    // (But only if it's actually in inventory - equipped items without inventory count don't consume)
+                    if (trinket.fromInventory) {
+                        const count = MetaProgression.getInventoryCount('equipment', trinket.id);
+                        if (count > 0) {
+                            MetaProgression.removeFromInventory('equipment', trinket.id, 1);
+                        }
+                    }
+                    
+                    // If there was a previously equipped trinket, add it back to inventory
+                    if (currentTrinketId) {
+                        MetaProgression.addToInventory('equipment', currentTrinketId, 1);
+                    }
+                    
                     MetaProgression.equipTrinket(trinket.id, i);
                     this.updateEquipment(npc);
                     if (this.game.player && this.game.inOutpost) {
@@ -701,6 +813,12 @@ class DialogueSystem {
                         if (earned > 0) {
                             this.game.sound.play('build');
                             this.textEl.textContent = `Sold ${equipment.name} for ◆${earned} essence.`;
+                            // Update dialogue essence display
+                            this.essenceEl.textContent = `◆ ${MetaProgression.data.essence}`;
+                            // Update HUD if player exists
+                            if (this.game.player && this.game.player.updateEssenceUI) {
+                                this.game.player.updateEssenceUI();
+                            }
                             this.updateTrader(npc);
                         }
                     };
@@ -717,6 +835,12 @@ class DialogueSystem {
                         if (earned > 0) {
                             this.game.sound.play('build');
                             this.textEl.textContent = `Sold ${itemData.count}x ${equipment.name} for ◆${earned} essence.`;
+                            // Update dialogue essence display
+                            this.essenceEl.textContent = `◆ ${MetaProgression.data.essence}`;
+                            // Update HUD if player exists
+                            if (this.game.player && this.game.player.updateEssenceUI) {
+                                this.game.player.updateEssenceUI();
+                            }
                             this.updateTrader(npc);
                         }
                     };

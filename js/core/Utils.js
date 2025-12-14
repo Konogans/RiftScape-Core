@@ -175,12 +175,33 @@ const MetaProgression = {
             if (saved) {
                 const loaded = JSON.parse(saved);
                 Object.assign(this.data, loaded);
-                // Ensure equipment structure exists (for backward compatibility)
-                if (!this.data.equipment) {
-                    this.data.equipment = { weapon: null, trinkets: [null, null, null] };
-                }
-                if (!this.data.equipment.trinkets || this.data.equipment.trinkets.length !== 3) {
-                    this.data.equipment.trinkets = [null, null, null];
+            }
+            // Ensure equipment structure exists (for backward compatibility and new games)
+            if (!this.data.equipment) {
+                this.data.equipment = { weapon: null, trinkets: [null, null, null] };
+            }
+            if (!this.data.equipment.trinkets || this.data.equipment.trinkets.length !== 3) {
+                this.data.equipment.trinkets = [null, null, null];
+            }
+            // Ensure inventory exists
+            if (!this.data.inventory) {
+                this.data.inventory = [];
+            }
+            
+            // Auto-equip character's default weapon if no weapon is equipped
+            if (!this.data.equipment.weapon) {
+                const charDef = CharacterRegistry.get(this.data.currentCharacter);
+                if (charDef && charDef.model && charDef.model.weapon) {
+                    // Find the matching equipment ID for the default weapon
+                    // Match by weapon model path
+                    const defaultWeaponPath = charDef.model.weapon.path;
+                    const allWeapons = EquipmentRegistry.getByType('weapon');
+                    const matchingWeapon = allWeapons.find(w => w.model && w.model.path === defaultWeaponPath);
+                    
+                    if (matchingWeapon) {
+                        this.data.equipment.weapon = matchingWeapon.id;
+                        this.save();
+                    }
                 }
             }
         } catch (e) { console.log('Load failed'); }
@@ -266,6 +287,9 @@ const MetaProgression = {
     },
     
     unequipWeapon() {
+        if (!this.data.equipment.weapon) return false;
+        // Add weapon back to inventory before clearing
+        this.addToInventory('equipment', this.data.equipment.weapon, 1);
         this.data.equipment.weapon = null;
         this.save();
         return true;
@@ -283,6 +307,9 @@ const MetaProgression = {
     
     unequipTrinket(slotIndex) {
         if (slotIndex < 0 || slotIndex >= 3) return false;
+        if (!this.data.equipment.trinkets[slotIndex]) return false;
+        // Add trinket back to inventory before clearing
+        this.addToInventory('equipment', this.data.equipment.trinkets[slotIndex], 1);
         this.data.equipment.trinkets[slotIndex] = null;
         this.save();
         return true;

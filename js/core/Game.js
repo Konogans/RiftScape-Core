@@ -617,7 +617,7 @@ class Game {
             nodeInfo = ` | ${node.name} [Depth: ${dist}m] Lvl:${node.level}`;
         }
         
-        this.hud.updateDebug(`RiftScape v3.1 CANVAS HUD\n${BiomeRegistry.get(this.currentBiome).name}\nEntities: ${this.entities.length}\nFPS: ${(1/dt).toFixed(0)} ${buffList} ${nodeInfo}`);
+        this.hud.updateDebug(`RiftScape v3.2 CANVAS HUD\n${BiomeRegistry.get(this.currentBiome).name}\nEntities: ${this.entities.length}\nFPS: ${(1/dt).toFixed(0)} ${buffList} ${nodeInfo}`);
         
         this.renderer.render(this.scene, this.camera);
         if (this.hud) this.hud.render(this.renderer);

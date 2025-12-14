@@ -415,22 +415,31 @@ class Enemy {
             }
         }
         
-        // Equipment drops (rare)
+        // Equipment drops (rare) - spawn as pickup
         if (loot.equipment) {
             const equipDef = loot.equipment;
-            if (Math.random() < (equipDef.chance || 0.05)) {
+            const chance = equipDef.chance !== undefined ? equipDef.chance : 1.05;
+            const roll = Math.random();
+            
+            // Force number conversion in case it's a string
+            const chanceNum = typeof chance === 'string' ? parseFloat(chance) : Number(chance);
+            const rollNum = Number(roll);
+            
+            if (rollNum < chanceNum) {
                 // Roll for which equipment to drop
                 const equipmentList = equipDef.items || [];
                 if (equipmentList.length > 0) {
                     const randomEquip = equipmentList[Math.floor(Math.random() * equipmentList.length)];
                     const equipId = randomEquip.id || randomEquip;
-                    // Add directly to inventory (no pickup needed)
-                    MetaProgression.addToInventory('equipment', equipId, 1);
                     
-                    // Visual feedback
-                    const equipName = EquipmentRegistry.get(equipId)?.name || 'Item';
-                    this.game.spawnFloatingText(x, z, `+${equipName}`, 0x88ff88);
-                    if (this.game.sound) this.game.sound.play('build'); // Item pickup sound
+                    // Validate equipment exists
+                    if (!EquipmentRegistry.get(equipId)) {
+                        console.warn(`[Enemy] Equipment drop failed: '${equipId}' not found in EquipmentRegistry!`);
+                        return;
+                    }
+                    
+                    // Spawn as pickup (value is the equipment ID)
+                    this.game.spawnPickup(x + (Math.random() - 0.5), z + (Math.random() - 0.5), 'equipment', equipId);
                 }
             }
         }
