@@ -110,18 +110,21 @@ class Enemy {
             this.modelMaterials = [];
             this.mesh.traverse((child) => {
                 if (child.isMesh && child.material) {
-                    const mat = child.material;
+                    // Handle both single materials and material arrays
+                    const materials = Array.isArray(child.material) ? child.material : [child.material];
 
-                    // Reduce metallic/shiny look
-                    if (mat.metalness !== undefined) mat.metalness = 0.1;
-                    if (mat.roughness !== undefined) mat.roughness = 0.8;
+                    for (const mat of materials) {
+                        // Reduce metallic/shiny look
+                        if (mat.metalness !== undefined) mat.metalness = 0.1;
+                        if (mat.roughness !== undefined) mat.roughness = 0.8;
 
-                    this.modelMaterials.push({
-                        material: mat,
-                        color: mat.color ? mat.color.getHex() : null,
-                        emissive: mat.emissive ? mat.emissive.getHex() : null,
-                        emissiveIntensity: mat.emissiveIntensity || 0
-                    });
+                        this.modelMaterials.push({
+                            material: mat,
+                            color: mat.color ? mat.color.getHex() : null,
+                            emissive: mat.emissive ? mat.emissive.getHex() : null,
+                            emissiveIntensity: mat.emissiveIntensity || 0
+                        });
+                    }
                 }
             });
 

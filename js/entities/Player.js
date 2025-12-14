@@ -127,18 +127,21 @@ class Player {
             this.modelMaterials = [];
             model.traverse((child) => {
                 if (child.isMesh && child.material) {
-                    const mat = child.material;
+                    // Handle both single materials and material arrays
+                    const materials = Array.isArray(child.material) ? child.material : [child.material];
 
-                    // Reduce metallic/shiny look
-                    if (mat.metalness !== undefined) mat.metalness = 0.1;
-                    if (mat.roughness !== undefined) mat.roughness = 0.8;
+                    for (const mat of materials) {
+                        // Reduce metallic/shiny look
+                        if (mat.metalness !== undefined) mat.metalness = 0.1;
+                        if (mat.roughness !== undefined) mat.roughness = 0.8;
 
-                    this.modelMaterials.push({
-                        material: mat,
-                        color: mat.color ? mat.color.getHex() : null,
-                        emissive: mat.emissive ? mat.emissive.getHex() : null,
-                        emissiveIntensity: mat.emissiveIntensity || 0
-                    });
+                        this.modelMaterials.push({
+                            material: mat,
+                            color: mat.color ? mat.color.getHex() : null,
+                            emissive: mat.emissive ? mat.emissive.getHex() : null,
+                            emissiveIntensity: mat.emissiveIntensity || 0
+                        });
+                    }
                     child.castShadow = true;
                 }
             });
@@ -205,10 +208,11 @@ class Player {
             const weapon = glb.scene;
             weapon.scale.setScalar(weaponDef.scale || 1.0);
 
-            // Find the bone to attach to
+            // Find the bone/object to attach to
             let targetBone = null;
             model.traverse((child) => {
-                if (child.isBone && child.name === weaponDef.bone) {
+                // Match by name - check bones first, then any object
+                if (child.name === weaponDef.bone) {
                     targetBone = child;
                 }
             });
@@ -235,8 +239,12 @@ class Player {
                 // Reduce shininess on weapon too
                 weapon.traverse((child) => {
                     if (child.isMesh && child.material) {
-                        if (child.material.metalness !== undefined) child.material.metalness = 0.3;
-                        if (child.material.roughness !== undefined) child.material.roughness = 0.6;
+                        // Handle both single materials and material arrays
+                        const materials = Array.isArray(child.material) ? child.material : [child.material];
+                        for (const mat of materials) {
+                            if (mat.metalness !== undefined) mat.metalness = 0.3;
+                            if (mat.roughness !== undefined) mat.roughness = 0.6;
+                        }
                     }
                 });
 
@@ -244,9 +252,9 @@ class Player {
                 this.weapon = weapon;
                 console.log(`[Player] Weapon attached to ${weaponDef.bone}`);
             } else {
-                console.warn(`[Player] Bone '${weaponDef.bone}' not found. Available bones:`);
+                console.warn(`[Player] Attachment point '${weaponDef.bone}' not found. Available objects:`);
                 model.traverse((child) => {
-                    if (child.isBone) console.log(`  - ${child.name}`);
+                    if (child.name) console.log(`  - ${child.name} (${child.type})`);
                 });
             }
         } catch (e) {
