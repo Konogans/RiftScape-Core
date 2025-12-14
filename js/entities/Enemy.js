@@ -75,19 +75,23 @@ class Enemy {
     }
     
     async loadModel(x, z, scale) {
-        // Pattern from mods/riftling_remastered.js (V4.4) - proven working implementation
-        const gltfLoader = new THREE.GLTFLoader();
-
         // Support both string path and object with path property
         const modelPath = typeof this.def.model === 'string' ? this.def.model : this.def.model.path;
         if (!modelPath) return;
 
         try {
-            const glb = await new Promise((resolve, reject) => {
-                // Cache-bust to ensure unique instance per enemy
-                const cacheBuster = '?v=' + (Enemy._modelCounter = (Enemy._modelCounter || 0) + 1);
-                gltfLoader.load(modelPath + cacheBuster, resolve, undefined, reject);
-            });
+            // Use model cache to avoid re-parsing GLB for each enemy
+            if (!Enemy._modelCache) Enemy._modelCache = {};
+
+            let glb = Enemy._modelCache[modelPath];
+            if (!glb) {
+                // First time loading this model - parse and cache
+                const gltfLoader = new THREE.GLTFLoader();
+                glb = await new Promise((resolve, reject) => {
+                    gltfLoader.load(modelPath, resolve, undefined, reject);
+                });
+                Enemy._modelCache[modelPath] = glb;
+            }
 
             const parent = this.mesh.parent;
             if (!this.game.entities.includes(this) && !parent) return;
@@ -99,8 +103,14 @@ class Enemy {
                 if (this.material) this.material.dispose();
             }
 
-            // Setup new mesh from GLB
-            this.mesh = glb.scene;
+            // Clone the cached model for this instance
+            // Use SkeletonUtils if available (for skinned meshes), otherwise basic clone
+            if (THREE.SkeletonUtils) {
+                this.mesh = THREE.SkeletonUtils.clone(glb.scene);
+            } else {
+                this.mesh = glb.scene.clone(true);
+            }
+            this.glbAnimations = glb.animations; // Store for mixer setup
             this.mesh.position.set(x, 0, z);
             this.mesh.scale.setScalar(scale);
             this.hasModel = true;
@@ -131,8 +141,9 @@ class Enemy {
             if (parent) parent.add(this.mesh);
             else if (this.game.scene) this.game.scene.add(this.mesh);
 
-            // Setup animation system
-            if (glb.animations && glb.animations.length > 0) {
+            // Setup animation system (use stored animations from cache)
+            const animations = this.glbAnimations || glb.animations;
+            if (animations && animations.length > 0) {
                 this.mixer = new THREE.AnimationMixer(this.mesh);
                 this.animActions = {};
                 this.currentAnim = null;
@@ -143,7 +154,7 @@ class Enemy {
                 // Check for explicit animation mappings in entity definition
                 const explicitAnims = this.def.model?.animations;
 
-                glb.animations.forEach(clip => {
+                animations.forEach(clip => {
                     const action = this.mixer.clipAction(clip);
                     action.setLoop(THREE.LoopRepeat);
                     this.animActions[clip.name] = action;

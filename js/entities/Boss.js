@@ -208,11 +208,8 @@ class Boss extends Enemy {
                                this.attackAction.status === 'cooldown';
             if (isAttacking) {
                 if (animNames.attack) this.playAnim(animNames.attack);
-            } else if (this.inRange) {
-                // In range but not attacking - idle
-                if (animNames.idle) this.playAnim(animNames.idle);
             } else {
-                // Walking while chasing
+                // Always walk when chasing (idle only during recover)
                 if (animNames.walk) this.playAnim(animNames.walk);
             }
         }
