@@ -33,6 +33,7 @@ class DialogueSystem {
 			scribe: "Knowledge is power. Expand your mind.",
 			builder: "The battlefield is a canvas. Build your defenses.",
 			pedalboard: "Customize your loadout. Each slot defines your combat style.",
+			equipment: "Arm yourself. Choose your weapon and trinkets.",
 			'reset': "To begin again is to lose everything. Are you certain?" // NEW
 		};
 		return greetings[role] || "Greetings.";
@@ -45,6 +46,12 @@ class DialogueSystem {
         // PEDALBOARD UI for Pedalboard Customizer
         if (npc.role === 'pedalboard') {
             this.updatePedalboard(npc);
+            return;
+        }
+        
+        // EQUIPMENT UI for Equipment Manager
+        if (npc.role === 'equipment') {
+            this.updateEquipment(npc);
             return;
         }
         
@@ -431,6 +438,165 @@ class DialogueSystem {
             }
         };
         this.optionsEl.appendChild(resetBtn);
+        
+        // Close button
+        const closeBtn = document.createElement('button');
+        closeBtn.className = 'dialogue-btn close-btn';
+        closeBtn.textContent = 'Close';
+        closeBtn.onclick = () => this.close();
+        this.optionsEl.appendChild(closeBtn);
+    }
+    
+    updateEquipment(npc) {
+        this.optionsEl.innerHTML = ''; // Clear to prevent duplication
+        
+        const equipment = MetaProgression.data.equipment || { weapon: null, trinkets: [null, null, null] };
+        
+        // WEAPON SLOT
+        const weaponSection = document.createElement('div');
+        weaponSection.className = 'pedalboard-section';
+        weaponSection.innerHTML = `<div class="section-title">Weapon</div>`;
+        
+        const weaponSlotDiv = document.createElement('div');
+        weaponSlotDiv.className = 'pedalboard-slot';
+        weaponSlotDiv.innerHTML = `<div class="slot-label">Equipped Weapon</div>`;
+        
+        const currentWeaponId = equipment.weapon;
+        const currentWeapon = currentWeaponId ? EquipmentRegistry.get(currentWeaponId) : null;
+        
+        const currentWeaponDiv = document.createElement('div');
+        currentWeaponDiv.className = 'current-ability';
+        if (currentWeapon) {
+            const statsText = currentWeapon.stats ? Object.entries(currentWeapon.stats)
+                .filter(([k, v]) => v !== 0)
+                .map(([k, v]) => `${k}: ${v > 0 ? '+' : ''}${v}`)
+                .join(', ') : '';
+            currentWeaponDiv.innerHTML = `
+                <div class="ability-name">${currentWeapon.name}</div>
+                <div class="ability-desc">${currentWeapon.description || ''}</div>
+                ${statsText ? `<div class="ability-desc" style="color:#88cc88; margin-top:4px;">${statsText}</div>` : ''}
+            `;
+        } else {
+            currentWeaponDiv.innerHTML = '<div class="ability-name" style="color:#666">None</div>';
+        }
+        weaponSlotDiv.appendChild(currentWeaponDiv);
+        
+        // Weapon selection
+        const weaponSelectDiv = document.createElement('div');
+        weaponSelectDiv.className = 'ability-select';
+        
+        EquipmentRegistry.getByType('weapon').forEach(weapon => {
+            const btn = document.createElement('button');
+            btn.className = 'ability-btn';
+            if (currentWeaponId === weapon.id) {
+                btn.classList.add('selected');
+            }
+            btn.textContent = weapon.name;
+            btn.title = weapon.description || '';
+            btn.onclick = () => {
+                MetaProgression.equipWeapon(weapon.id);
+                this.updateEquipment(npc);
+                if (this.game.player && this.game.inOutpost) {
+                    // Reload player to apply equipment changes
+                    this.game.loadHub();
+                }
+            };
+            weaponSelectDiv.appendChild(btn);
+        });
+        
+        // Clear weapon button
+        const clearWeaponBtn = document.createElement('button');
+        clearWeaponBtn.className = 'ability-btn clear-btn';
+        clearWeaponBtn.textContent = 'Clear';
+        if (!currentWeaponId) {
+            clearWeaponBtn.classList.add('disabled');
+        } else {
+            clearWeaponBtn.onclick = () => {
+                MetaProgression.unequipWeapon();
+                this.updateEquipment(npc);
+                if (this.game.player && this.game.inOutpost) {
+                    this.game.loadHub();
+                }
+            };
+        }
+        weaponSelectDiv.appendChild(clearWeaponBtn);
+        weaponSlotDiv.appendChild(weaponSelectDiv);
+        weaponSection.appendChild(weaponSlotDiv);
+        this.optionsEl.appendChild(weaponSection);
+        
+        // TRINKET SLOTS
+        const trinketSection = document.createElement('div');
+        trinketSection.className = 'pedalboard-section';
+        trinketSection.innerHTML = `<div class="section-title">Trinkets (3 Slots)</div>`;
+        
+        for (let i = 0; i < 3; i++) {
+            const trinketSlotDiv = document.createElement('div');
+            trinketSlotDiv.className = 'pedalboard-slot';
+            trinketSlotDiv.innerHTML = `<div class="slot-label">Trinket Slot ${i + 1}</div>`;
+            
+            const currentTrinketId = equipment.trinkets[i];
+            const currentTrinket = currentTrinketId ? EquipmentRegistry.get(currentTrinketId) : null;
+            
+            const currentTrinketDiv = document.createElement('div');
+            currentTrinketDiv.className = 'current-ability';
+            if (currentTrinket) {
+                const statsText = currentTrinket.stats ? Object.entries(currentTrinket.stats)
+                    .filter(([k, v]) => v !== 0)
+                    .map(([k, v]) => `${k}: ${v > 0 ? '+' : ''}${v}`)
+                    .join(', ') : '';
+                currentTrinketDiv.innerHTML = `
+                    <div class="ability-name">${currentTrinket.name}</div>
+                    <div class="ability-desc">${currentTrinket.description || ''}</div>
+                    ${statsText ? `<div class="ability-desc" style="color:#88cc88; margin-top:4px;">${statsText}</div>` : ''}
+                `;
+            } else {
+                currentTrinketDiv.innerHTML = '<div class="ability-name" style="color:#666">Empty</div>';
+            }
+            trinketSlotDiv.appendChild(currentTrinketDiv);
+            
+            // Trinket selection
+            const trinketSelectDiv = document.createElement('div');
+            trinketSelectDiv.className = 'ability-select';
+            
+            EquipmentRegistry.getByType('trinket').forEach(trinket => {
+                const btn = document.createElement('button');
+                btn.className = 'ability-btn';
+                if (currentTrinketId === trinket.id) {
+                    btn.classList.add('selected');
+                }
+                btn.textContent = trinket.name;
+                btn.title = trinket.description || '';
+                btn.onclick = () => {
+                    MetaProgression.equipTrinket(trinket.id, i);
+                    this.updateEquipment(npc);
+                    if (this.game.player && this.game.inOutpost) {
+                        this.game.player.refreshStats();
+                    }
+                };
+                trinketSelectDiv.appendChild(btn);
+            });
+            
+            // Clear trinket button
+            const clearTrinketBtn = document.createElement('button');
+            clearTrinketBtn.className = 'ability-btn clear-btn';
+            clearTrinketBtn.textContent = 'Clear';
+            if (!currentTrinketId) {
+                clearTrinketBtn.classList.add('disabled');
+            } else {
+                clearTrinketBtn.onclick = () => {
+                    MetaProgression.unequipTrinket(i);
+                    this.updateEquipment(npc);
+                    if (this.game.player && this.game.inOutpost) {
+                        this.game.player.refreshStats();
+                    }
+                };
+            }
+            trinketSelectDiv.appendChild(clearTrinketBtn);
+            trinketSlotDiv.appendChild(trinketSelectDiv);
+            trinketSection.appendChild(trinketSlotDiv);
+        }
+        
+        this.optionsEl.appendChild(trinketSection);
         
         // Close button
         const closeBtn = document.createElement('button');

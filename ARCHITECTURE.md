@@ -167,6 +167,7 @@ const SomeRegistry = {
 | **EntityRegistry** | `js/data/EntityRegistry.js` | Enemy definitions (riftling, spitter, etc.) |
 | **CharacterRegistry** | `js/data/CharacterRegistry.js` | Playable characters (wanderer, smith, etc.) |
 | **UpgradeRegistry** | `js/data/UpgradeRegistry.js` | Meta-progression upgrades |
+| **EquipmentRegistry** | `js/data/EquipmentRegistry.js` | Equippable weapons and trinkets |
 | **BiomeRegistry** | `js/data/BiomeRegistry.js` | World biomes (rift_wastes, sanctuary, etc.) |
 | **StructureRegistry** | `js/data/StructureRegistry.js` | Placeable structures (wall, turret) |
 | **PickupRegistry** | `js/data/PickupRegistry.js` | Loot pickups (essence, health) |

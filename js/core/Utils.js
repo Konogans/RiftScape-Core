@@ -156,7 +156,12 @@ const MetaProgression = {
         currentCharacter: 'wanderer', 
         unlockedCharacters: ['wanderer'], // Everyone starts as Wanderer
         // NEW: Custom Loadouts (per character)
-        customLoadouts: {} // Format: { characterId: { primary: 'swipe', secondary: 'slam', ... } }
+        customLoadouts: {}, // Format: { characterId: { primary: 'swipe', secondary: 'slam', ... } }
+        // NEW: Equipment (weapon + 3 trinkets)
+        equipment: {
+            weapon: null,      // Equipped weapon ID
+            trinkets: [null, null, null] // Equipped trinket IDs (3 slots)
+        }
     },
     save() {
         try { localStorage.setItem('riftscape_meta', JSON.stringify(this.data)); } 
@@ -165,7 +170,17 @@ const MetaProgression = {
     load() {
         try {
             const saved = localStorage.getItem('riftscape_meta');
-            if (saved) Object.assign(this.data, JSON.parse(saved));
+            if (saved) {
+                const loaded = JSON.parse(saved);
+                Object.assign(this.data, loaded);
+                // Ensure equipment structure exists (for backward compatibility)
+                if (!this.data.equipment) {
+                    this.data.equipment = { weapon: null, trinkets: [null, null, null] };
+                }
+                if (!this.data.equipment.trinkets || this.data.equipment.trinkets.length !== 3) {
+                    this.data.equipment.trinkets = [null, null, null];
+                }
+            }
         } catch (e) { console.log('Load failed'); }
     },
     reset() {
@@ -174,7 +189,11 @@ const MetaProgression = {
             magicAffinity: 0, techAffinity: 0, upgrades: {}, 
             currentCharacter: 'wanderer',
             unlockedCharacters: ['wanderer'],
-            customLoadouts: {}
+            customLoadouts: {},
+            equipment: {
+                weapon: null,
+                trinkets: [null, null, null]
+            }
         };
         this.save();
     },
@@ -231,6 +250,77 @@ const MetaProgression = {
             return true;
         }
         return false;
+    },
+    
+    // Equipment management
+    equipWeapon(equipmentId) {
+        if (!equipmentId || !EquipmentRegistry.get(equipmentId)) return false;
+        const item = EquipmentRegistry.get(equipmentId);
+        if (item.type !== 'weapon') return false;
+        this.data.equipment.weapon = equipmentId;
+        this.save();
+        return true;
+    },
+    
+    unequipWeapon() {
+        this.data.equipment.weapon = null;
+        this.save();
+        return true;
+    },
+    
+    equipTrinket(equipmentId, slotIndex) {
+        if (slotIndex < 0 || slotIndex >= 3) return false;
+        if (!equipmentId || !EquipmentRegistry.get(equipmentId)) return false;
+        const item = EquipmentRegistry.get(equipmentId);
+        if (item.type !== 'trinket') return false;
+        this.data.equipment.trinkets[slotIndex] = equipmentId;
+        this.save();
+        return true;
+    },
+    
+    unequipTrinket(slotIndex) {
+        if (slotIndex < 0 || slotIndex >= 3) return false;
+        this.data.equipment.trinkets[slotIndex] = null;
+        this.save();
+        return true;
+    },
+    
+    getEquipmentStats() {
+        const stats = {
+            attackDamage: 0,
+            attackSpeed: 0,
+            attackRange: 0,
+            maxHealth: 0,
+            maxReserve: 0,
+            moveSpeed: 0,
+            healthRegen: 0,
+            essenceBonus: 0,
+            damageReduction: 0
+        };
+        
+        // Weapon stats
+        if (this.data.equipment.weapon) {
+            const weapon = EquipmentRegistry.get(this.data.equipment.weapon);
+            if (weapon && weapon.stats) {
+                for (const [stat, value] of Object.entries(weapon.stats)) {
+                    if (stats[stat] !== undefined) stats[stat] += value;
+                }
+            }
+        }
+        
+        // Trinket stats
+        for (const trinketId of this.data.equipment.trinkets) {
+            if (trinketId) {
+                const trinket = EquipmentRegistry.get(trinketId);
+                if (trinket && trinket.stats) {
+                    for (const [stat, value] of Object.entries(trinket.stats)) {
+                        if (stats[stat] !== undefined) stats[stat] += value;
+                    }
+                }
+            }
+        }
+        
+        return stats;
     }
 };
 

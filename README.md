@@ -89,11 +89,12 @@ For detailed status information, please consult the `STATUS.md` file.
 
 | Status | Item |
 | :--- | :--- |
-| **MVP Status** | **~95% Complete** - Core systems fully functional, only Pedalboard UI customization remains. |
+| **MVP Status** | ✅ **COMPLETE** - All core systems fully functional and implemented. |
+| **Pedalboard System** | ✅ **COMPLETE** - Full UI for customizing ability loadouts via "The Tinkerer" NPC. |
+| **Equipment System** | ✅ **COMPLETE** - Weapon (1 slot) and trinket (3 slots) system with model attachments and stat bonuses. |
 | **Animation System** | ✅ **COMPLETE** - Enemy and player animation synchronization integrated. |
 | **Sound System** | ✅ **COMPLETE** - Music loading and procedural SFX fully implemented. |
 | **Bugs** | ✅ **ALL RESOLVED** - All documented bugs have been fixed. |
-| **Remaining Work** | **Pedalboard Customization UI** - Allow players to customize ability loadouts in the Outpost. |
 
 -----
 

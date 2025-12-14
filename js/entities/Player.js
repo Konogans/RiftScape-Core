@@ -25,10 +25,11 @@ class Player {
         const charId = MetaProgression.data.currentCharacter || 'wanderer';
         this.charDef = CharacterRegistry.get(charId);
         this.mods = MetaProgression.getStatMods();
+        this.equipmentStats = MetaProgression.getEquipmentStats(); // NEW: Equipment stats
         
         this.baseSpeed = 4.0;
-        this.speed = this.baseSpeed * (1 + this.mods.moveSpeed + (this.charDef.stats.moveSpeed||0));
-        this.baseAttackDamage = 1 + this.mods.attackDamage + (this.charDef.stats.attackDamage||0);
+        this.speed = this.baseSpeed * (1 + this.mods.moveSpeed + (this.charDef.stats.moveSpeed||0) + (this.equipmentStats.moveSpeed||0));
+        this.baseAttackDamage = 1 + this.mods.attackDamage + (this.charDef.stats.attackDamage||0) + (this.equipmentStats.attackDamage||0);
         this.attackDamage = this.baseAttackDamage;
         
         // 2. STATE
@@ -210,9 +211,24 @@ class Player {
                 }
             }
 
-            // Load weapon if defined
-            if (modelDef.weapon) {
-                this.loadWeapon(model, modelDef.weapon);
+            // Load weapon from equipment or character default
+            const weaponId = MetaProgression.data.equipment?.weapon;
+            let weaponDef = null;
+            
+            if (weaponId) {
+                const weaponItem = EquipmentRegistry.get(weaponId);
+                if (weaponItem && weaponItem.model) {
+                    weaponDef = weaponItem.model;
+                }
+            }
+            
+            // Fall back to character default weapon if no equipment weapon
+            if (!weaponDef && modelDef.weapon) {
+                weaponDef = modelDef.weapon;
+            }
+            
+            if (weaponDef) {
+                this.loadWeapon(model, weaponDef);
             }
         } catch (e) {
             console.warn('[Player] Model load failed:', e);
@@ -221,6 +237,24 @@ class Player {
     }
 
     async loadWeapon(model, weaponDef) {
+        // Remove existing weapon if present
+        if (this.weapon) {
+            this.mesh.remove(this.weapon);
+            this.weapon.traverse((child) => {
+                if (child.isMesh) {
+                    child.geometry?.dispose();
+                    if (Array.isArray(child.material)) {
+                        child.material.forEach(mat => mat.dispose());
+                    } else {
+                        child.material?.dispose();
+                    }
+                }
+            });
+            this.weapon = null;
+            this.weaponBone = null;
+            this.weaponOffset = null;
+        }
+        
         try {
             const loader = new THREE.GLTFLoader();
             const glb = await new Promise((resolve, reject) => {
@@ -347,11 +381,11 @@ class Player {
     }
     
 	initHealth() {
-        const baseActive = 5 + this.mods.maxHealth + this.charDef.stats.maxHealth;
-        const baseReserve = 10 + this.mods.maxReserve + this.charDef.stats.maxReserve;
+        const baseActive = 5 + this.mods.maxHealth + this.charDef.stats.maxHealth + (this.equipmentStats.maxHealth||0);
+        const baseReserve = 10 + this.mods.maxReserve + this.charDef.stats.maxReserve + (this.equipmentStats.maxReserve||0);
         
         // NERF: Reduced base regen from 0.5 to 0.1 (5x slower)
-        const baseRegen = 0.1 + this.mods.regenRate; 
+        const baseRegen = 0.1 + this.mods.regenRate + (this.equipmentStats.healthRegen||0); 
         
         this.health = new PointPool({ 
             active: baseActive, 
@@ -636,26 +670,27 @@ class Player {
     
 	// Called when buying upgrades to pull fresh Meta data
     refreshStats() {
-        // 1. Re-fetch Meta Mods
+        // 1. Re-fetch Meta Mods & Equipment Stats
         this.mods = MetaProgression.getStatMods();
+        this.equipmentStats = MetaProgression.getEquipmentStats();
         
-        // 2. Update Base Stats (Stats from Character + Meta)
-        this.baseSpeed = 4.0 * (1 + this.mods.moveSpeed + (this.charDef.stats.moveSpeed||0));
-        this.baseAttackDamage = 1 + this.mods.attackDamage + (this.charDef.stats.attackDamage||0);
+        // 2. Update Base Stats (Stats from Character + Meta + Equipment)
+        this.baseSpeed = 4.0 * (1 + this.mods.moveSpeed + (this.charDef.stats.moveSpeed||0) + (this.equipmentStats.moveSpeed||0));
+        this.baseAttackDamage = 1 + this.mods.attackDamage + (this.charDef.stats.attackDamage||0) + (this.equipmentStats.attackDamage||0);
         
         // 3. Update Health Pools (Grow max, keep current ratio or just add flat?)
         // Simple approach: Update max, current stays same (percentage drops)
         const oldMaxActive = this.health.maxActive;
         const oldMaxReserve = this.health.maxReserve;
         
-        this.health.maxActive = 5 + this.mods.maxHealth + (this.charDef.stats.maxHealth||0);
-        this.health.maxReserve = 10 + this.mods.maxReserve + (this.charDef.stats.maxReserve||0);
+        this.health.maxActive = 5 + this.mods.maxHealth + (this.charDef.stats.maxHealth||0) + (this.equipmentStats.maxHealth||0);
+        this.health.maxReserve = 10 + this.mods.maxReserve + (this.charDef.stats.maxReserve||0) + (this.equipmentStats.maxReserve||0);
         
         // Optional: Heal the difference if you want upgrades to feel good immediately
         if (this.health.maxActive > oldMaxActive) this.health.active += (this.health.maxActive - oldMaxActive);
         if (this.health.maxReserve > oldMaxReserve) this.health.reserve += (this.health.maxReserve - oldMaxReserve);
         
-        this.health.activeRegen = 0.1 + this.mods.regenRate;
+        this.health.activeRegen = 0.1 + this.mods.regenRate + (this.equipmentStats.healthRegen||0);
 
         // 4. Re-run Buff calculations
         this.recalculateStats();

@@ -221,6 +221,7 @@ MetaProgression.data.essence              // Current essence
 MetaProgression.data.currentCharacter    // Current character ID
 MetaProgression.data.unlockedCharacters  // Array of unlocked character IDs
 MetaProgression.data.customLoadouts      // Object with custom loadouts per character
+MetaProgression.data.equipment           // Object with { weapon: string|null, trinkets: [string|null, string|null, string|null] }
 MetaProgression.data.upgrades            // Object with owned upgrade IDs
 ```
 
@@ -261,6 +262,41 @@ Sets the current character.
 
 **Returns:** `boolean` - true if character is unlocked
 
+#### `equipWeapon(equipmentId: string): boolean`
+Equips a weapon.
+
+**Parameters:**
+- `equipmentId` - Equipment ID from EquipmentRegistry
+
+**Returns:** `boolean` - true if equipment is valid and equipped
+
+#### `unequipWeapon(): boolean`
+Unequips the current weapon.
+
+**Returns:** `boolean` - always true
+
+#### `equipTrinket(equipmentId: string, slotIndex: number): boolean`
+Equips a trinket to a specific slot.
+
+**Parameters:**
+- `equipmentId` - Equipment ID from EquipmentRegistry
+- `slotIndex` - Slot index (0-2)
+
+**Returns:** `boolean` - true if equipment is valid and equipped
+
+#### `unequipTrinket(slotIndex: number): boolean`
+Unequips a trinket from a specific slot.
+
+**Parameters:**
+- `slotIndex` - Slot index (0-2)
+
+**Returns:** `boolean` - true if slot index is valid
+
+#### `getEquipmentStats(): Object`
+Gets aggregated stat bonuses from all equipped items.
+
+**Returns:** Object with stat modifiers from weapons and trinkets
+
 ---
 
 ## Registries
@@ -295,6 +331,7 @@ Gets all registered entries.
 - `EntityRegistry` - Enemy definitions
 - `CharacterRegistry` - Playable characters
 - `UpgradeRegistry` - Meta-progression upgrades
+- `EquipmentRegistry` - Equippable weapons and trinkets
 - `BiomeRegistry` - World biomes
 - `StructureRegistry` - Placeable structures
 - `PickupRegistry` - Loot pickups
