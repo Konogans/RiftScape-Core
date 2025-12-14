@@ -185,15 +185,29 @@ class Player {
         if (!this.animActions || this.currentAnim === name || !this.animActions[name]) return;
 
         const newAction = this.animActions[name];
+        const animNames = this.charDef.model?.animations || {};
 
+        // Stop previous one-shot animation if switching away
         if (this.currentAnim && this.animActions[this.currentAnim]) {
             const oldAction = this.animActions[this.currentAnim];
+            const oneShotAnims = [animNames.attack, animNames.slam, animNames.death, animNames.dash];
+            if (oneShotAnims.includes(this.currentAnim)) {
+                oldAction.stop();
+            }
             newAction.reset();
             newAction.play();
             newAction.crossFadeFrom(oldAction, fadeTime, true);
         } else {
             newAction.reset();
             newAction.play();
+        }
+
+        // Re-apply timeScale after reset() clears it
+        if (name === animNames.attack && this.attackTimeScale) {
+            newAction.setEffectiveTimeScale(this.attackTimeScale);
+        }
+        if (name === animNames.slam && this.slamTimeScale) {
+            newAction.setEffectiveTimeScale(this.slamTimeScale);
         }
 
         this.currentAnim = name;
@@ -652,11 +666,12 @@ class Player {
 		
 			// FIX: AIM OVERRIDE
 			// Check if ANY action is active (Primary, Secondary, Utility, etc.)
+			// Exception: Mobility (dash) should face movement direction, not mouse
 			let isAiming = input.isMouseHeld(0); // Always aim if LMB held
-			
-			// Check all slots for 'windup' or 'action' status
-			const slots = ['primary', 'secondary', 'mobility', 'utility', 'mastery'];
-			for (const slot of slots) {
+
+			// Check slots for 'windup' or 'action' status (exclude mobility)
+			const aimSlots = ['primary', 'secondary', 'utility', 'mastery'];
+			for (const slot of aimSlots) {
 				if (this.actions[slot]) {
 					const status = this.actions[slot].status;
 					if (status === 'windup' || status === 'action') {
