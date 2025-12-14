@@ -80,7 +80,34 @@
 	<script src="mods/mods_list.js"></script>
 	
     <script>
-        window.addEventListener('load', () => { window.game = new Game(); });
+        window.addEventListener('load', () => { 
+            window.game = new Game();
+            
+            // Namespace consolidation for future-proofing (backward compatible)
+            // All existing window.* access still works, but now also available via window.RiftScape.*
+            if (!window.RiftScape) {
+                window.RiftScape = {
+                    Game: Game,
+                    WorldState: WorldState,
+                    WorldManager: WorldManager,
+                    HubState: HubState,
+                    ModManager: ModManager,
+                    PSXify: PSXify,
+                    // Registries
+                    AbilityRegistry: AbilityRegistry,
+                    EntityRegistry: EntityRegistry,
+                    CharacterRegistry: CharacterRegistry,
+                    UpgradeRegistry: UpgradeRegistry,
+                    BiomeRegistry: BiomeRegistry,
+                    StructureRegistry: StructureRegistry,
+                    PickupRegistry: PickupRegistry,
+                    // Systems
+                    BehaviorSystem: BehaviorSystem,
+                    AttackSystem: AttackSystem,
+                    MetaProgression: MetaProgression
+                };
+            }
+        });
     </script>
     
     <!-- Footer -->

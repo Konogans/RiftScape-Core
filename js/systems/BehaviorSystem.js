@@ -1,20 +1,32 @@
 /**
- * BehaviorSystem.js
- * Interprets behavior patterns defined in EntityRegistry.
- * 
- * Usage: BehaviorSystem.execute(enemy, behaviorId, deltaTime, game)
+ * BehaviorSystem - Interprets behavior patterns defined in EntityRegistry.
  * 
  * Behaviors are composable - an enemy can have a primary behavior
  * that switches based on conditions (health, distance, etc.)
+ * 
+ * @namespace BehaviorSystem
+ * @property {Object} behaviors - Registered behavior functions
  */
-
 const BehaviorSystem = {
     behaviors: {},
     
+    /**
+     * Registers a new behavior pattern.
+     * @param {string} id - Behavior ID
+     * @param {Function} behaviorFn - Behavior function (entity, deltaTime, game) => { dist, inRange, ... }
+     */
     register(id, behaviorFn) {
         this.behaviors[id] = behaviorFn;
     },
     
+    /**
+     * Executes a behavior for an entity.
+     * @param {Enemy} entity - Enemy entity
+     * @param {string} behaviorId - Behavior ID
+     * @param {number} deltaTime - Time since last frame in seconds
+     * @param {Game} game - Game instance
+     * @returns {Object} Behavior result with { dist, inRange, ... }
+     */
     execute(entity, behaviorId, deltaTime, game) {
         const behavior = this.behaviors[behaviorId];
         if (!behavior) {

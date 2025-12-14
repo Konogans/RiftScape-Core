@@ -1,4 +1,23 @@
+/**
+ * Player entity - handles player character, abilities, and pedalboard system.
+ * 
+ * @class Player
+ * @property {Game} game - Reference to Game instance
+ * @property {Object} charDef - Character definition from CharacterRegistry
+ * @property {Object} actions - Pedalboard actions (primary, secondary, mobility, utility, mastery)
+ * @property {PointPool} health - Dual-pool health system (active/reserve)
+ * @property {THREE.Mesh} mesh - THREE.js mesh
+ * @property {THREE.AnimationMixer} mixer - Animation mixer for model animations
+ * @property {Object} animActions - Animation actions by name
+ * @property {number} speed - Current movement speed
+ * @property {number} attackDamage - Current attack damage
+ */
 class Player {
+    /**
+     * Creates a new Player instance.
+     * @param {Game} game - Game instance
+     * @constructor
+     */
     constructor(game) {
         this.game = game;
         

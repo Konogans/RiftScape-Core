@@ -1,11 +1,28 @@
 /**
- * Enemy.js (REFACTORED)
- * Now a thin shell that delegates to BehaviorSystem and AttackSystem.
+ * Enemy entity - base class for all enemies.
+ * Delegates behavior to BehaviorSystem and attacks to AttackSystem.
  * 
- * The entity IS the data; this class just gives it a heartbeat.
+ * @class Enemy
+ * @property {Game} game - Reference to Game instance
+ * @property {string} type - Enemy type ID
+ * @property {Object} def - Enemy definition from EntityRegistry
+ * @property {PointPool} health - Dual-pool health system
+ * @property {Action} attackAction - Attack action managed by AttackSystem
+ * @property {THREE.Mesh} mesh - THREE.js mesh
+ * @property {THREE.AnimationMixer} mixer - Animation mixer for model animations
+ * @property {Object} animActions - Animation actions by name
+ * @property {boolean} dead - Entity is dead
+ * @property {string} currentBehavior - Current behavior state (chase, patrol, etc.)
  */
-
 class Enemy {
+    /**
+     * Creates a new Enemy instance.
+     * @param {Game} game - Game instance
+     * @param {number} x - Spawn X position
+     * @param {number} z - Spawn Z position
+     * @param {string} [type='default'] - Enemy type ID from EntityRegistry
+     * @constructor
+     */
     constructor(game, x, z, type = 'default') {
         this.game = game;
         this.type = type;

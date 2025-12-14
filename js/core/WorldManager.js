@@ -296,18 +296,27 @@ class WorldManager {
         this.update(0, 0);
     }
 	
+	/**
+	 * Updates the flow field for enemy pathfinding using BFS (Breadth-First Search).
+	 * Creates a vector field that points toward the target, avoiding obstacles.
+	 * Runs at 5Hz (not every frame) for performance.
+	 * 
+	 * @param {number} targetX - Target X position
+	 * @param {number} targetZ - Target Z position
+	 */
 	updateFlowField(targetX, targetZ) {
         this.flowField = {}; 
         const q = [];
         const visited = new Set();
         
+        // Start from target and work outward (reverse pathfinding)
         const tX = Math.floor(targetX);
         const tZ = Math.floor(targetZ);
         
         q.push({x: tX, z: tZ, dist: 0});
         visited.add(`${tX},${tZ}`);
         
-        const range = 40; 
+        const range = 40; // Maximum flow field range 
         
         while(q.length > 0) {
             const curr = q.shift();
@@ -349,11 +358,17 @@ class WorldManager {
         }
     }
     
-    // 3. Helper for Entities to ask for directions
+    /**
+     * Gets flow field direction at a position using bilinear interpolation.
+     * Blends the 4 nearest grid cells for smooth directional movement.
+     * 
+     * @param {number} x - X position
+     * @param {number} z - Z position
+     * @returns {Object|null} Flow vector { x, z } or null if no flow field
+     */
     getFlowVector(x, z) {
-        // FIX: Bilinear Interpolation
-        // Instead of grabbing one rough direction, we blend the 4 nearest grid cells.
-        // This effectively simulates "infinite" directions.
+        // Bilinear Interpolation: Blend 4 nearest grid cells for smooth directions
+        // This simulates "infinite" directions instead of 8 discrete ones
 
         // We shift by -0.5 so that the vector is centered on the cell
         const sampleX = x - 0.5;

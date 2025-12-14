@@ -15,10 +15,21 @@ class WorldNode {
     }
 }
 
+/**
+ * WorldState - Manages procedural world generation and node graph.
+ * 
+ * @namespace WorldState
+ * @property {Object} nodes - World node graph
+ * @property {string} currentNodeId - Current active node ID
+ */
 const WorldState = {
     nodes: {},
     currentNodeId: null,
     
+    /**
+     * Generates the procedural world node graph.
+     * Creates outposts, wilderness areas, and dungeons.
+     */
     generate() {
         console.log("Generating Spatial World Graph...");
         this.nodes = {};

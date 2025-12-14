@@ -1,5 +1,26 @@
-
+/**
+ * Main Game class - coordinates all systems and manages the game loop.
+ * 
+ * @class Game
+ * @property {ModManager} modManager - Hot-swappable mod system
+ * @property {RaidManager} raidManager - Wave-based raid system
+ * @property {DialogueSystem} dialogueSystem - NPC dialogue and shop UI
+ * @property {Array<Entity>} entities - All active entities in the game
+ * @property {Array<Structure>} structures - Player-placed structures
+ * @property {SoundSystem} sound - Audio system (music + SFX)
+ * @property {HUDSystem} hud - Canvas-based HUD rendering
+ * @property {WorldManager} world - Chunk loading and collision system
+ * @property {Input} input - Keyboard and mouse input
+ * @property {Player} player - Player entity
+ * @property {THREE.Scene} scene - THREE.js scene
+ * @property {THREE.Camera} camera - THREE.js camera
+ * @property {THREE.WebGLRenderer} renderer - THREE.js renderer
+ */
 class Game {
+    /**
+     * Creates a new Game instance and initializes all systems.
+     * @constructor
+     */
     constructor() {
 		this.modManager = new ModManager(this); // Init System
 		this.setupDragAndDrop(); // 2. Setup Drag & Drop
@@ -125,12 +146,19 @@ class Game {
         this.spawnTimer = 0; this.spawnInterval = 3000; this.maxEnemies = 10; this.runEssence = 0;
     }
     
+    /**
+     * Spawns an enemy near the player with collision checking.
+     * Uses random angle/distance to find valid spawn position.
+     * @param {string|null} forceType - Optional enemy type to force spawn
+     */
     spawnEnemy(forceType = null) {
-if (this.enemies.length >= this.maxEnemies) return;
+        if (this.enemies.length >= this.maxEnemies) return;
         
         let x, z, attempts = 0;
         let valid = false;
         
+        // Try up to 50 times to find a valid spawn position
+        // Spawns 10-18 units away from player in random direction
         while (!valid && attempts < 50) {
             const angle = Math.random() * Math.PI * 2;
             const dist = 10 + Math.random() * 8;
@@ -143,13 +171,13 @@ if (this.enemies.length >= this.maxEnemies) return;
                     valid = true;
                 }
             } else {
-                valid = true; 
+                valid = true; // No world = no collision check needed
             }
             attempts++;
         }
         
         if (!valid) {
-            // DEBUG LOG: If this prints, the Grid is clogged.
+            // If this prints, the world grid is too cluttered
             console.warn("Spawn failed: No valid space found after 50 attempts.");
             return; 
         }
@@ -229,24 +257,37 @@ if (this.enemies.length >= this.maxEnemies) return;
         if (entIdx > -1) this.entities.splice(entIdx, 1);
     }
 
+	/**
+	 * Cleans up all entities, optionally preserving the player.
+	 * Used when transitioning biomes or returning to hub.
+	 * @param {boolean} forceClearPlayer - If true, removes player too (hub transitions)
+	 */
 	cleanupEntities(forceClearPlayer = false) {
+		// Create copy of array to avoid modification during iteration
 		[...this.entities].forEach(e => {
-			// FIX: If forceClearPlayer is true, delete EVERYONE.
+			// Preserve player unless force clearing (e.g., returning to hub)
 			if (!forceClearPlayer && e === this.player) return;
 			this.safeRemove(e, null);
 		});
 
+		// Clear specialized arrays
 		this.enemies = [];
 		this.projectiles = [];
 		this.pickups = [];
+		
+		// Cleanup particle effects
 		this.particles.forEach(p => { 
-			this.scene.remove(p.mesh); p.mesh.geometry.dispose(); p.mesh.material.dispose(); 
+			this.scene.remove(p.mesh); 
+			p.mesh.geometry.dispose(); 
+			p.mesh.material.dispose(); 
 		});
 		this.particles = [];
 
+		// Clear main arrays
 		this.entities = [];
 		this.structures = [];
-		// Only keep player in the list if we didn't force clear
+		
+		// Re-add player if we preserved it
 		if (!forceClearPlayer && this.player) this.entities.push(this.player);
 	}
     

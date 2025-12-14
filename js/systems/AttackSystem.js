@@ -1,18 +1,30 @@
 /**
- * AttackSystem.js
- * Interprets attack patterns defined in EntityRegistry.
+ * AttackSystem - Interprets attack patterns defined in EntityRegistry.
  * 
  * Separates attack LOGIC from attack DATA.
  * Entity definitions specify attack type, system executes it.
+ * 
+ * @namespace AttackSystem
+ * @property {Object} patterns - Registered attack pattern definitions
  */
-
 const AttackSystem = {
     patterns: {},
     
+    /**
+     * Registers a new attack pattern.
+     * @param {string} id - Attack pattern ID
+     * @param {Object} patternDef - Pattern definition with onWindup, onAction, onCooldown, onFinish
+     */
     register(id, patternDef) {
         this.patterns[id] = patternDef;
     },
     
+    /**
+     * Creates an Action instance for an entity's attack.
+     * @param {Enemy} entity - Enemy entity
+     * @param {Game} game - Game instance
+     * @returns {Action} Action instance with attack timing and callbacks
+     */
     createAction(entity, game) {
         const attackDef = entity.def.attack || { type: 'melee' };
         const pattern = this.patterns[attackDef.type] || this.patterns['melee'];

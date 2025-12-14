@@ -80,6 +80,13 @@ This approach, where you treat temporary .js files dropped into the running game
 
 For detailed status information, please consult the `STATUS.md` file.
 
+**Documentation:**
+- 📖 [ARCHITECTURE.md](ARCHITECTURE.md) - System architecture and design patterns
+- 📘 [API.md](API.md) - Public API reference
+- 📝 [CONTRIBUTING.md](CONTRIBUTING.md) - Contributor guidelines and style guide
+- 📊 [STATUS.md](STATUS.md) - Current status and roadmap
+- 💡 [IDEAS.md](IDEAS.md) - Future feature backlog
+
 | Status | Item |
 | :--- | :--- |
 | **MVP Status** | **~95% Complete** - Core systems fully functional, only Pedalboard UI customization remains. |
