@@ -116,13 +116,19 @@ class Enemy {
             this.hasModel = true;
             this.baseY = 0;
 
-            // Store original materials for hit flash effect and reduce shininess
+            // Clone materials for this instance (so disposal doesn't affect cache)
+            // and store for flash effects
             this.modelMaterials = [];
             this.mesh.traverse((child) => {
                 if (child.isMesh && child.material) {
-                    // Handle both single materials and material arrays
-                    const materials = Array.isArray(child.material) ? child.material : [child.material];
+                    // Clone materials to avoid shared reference issues
+                    if (Array.isArray(child.material)) {
+                        child.material = child.material.map(m => m.clone());
+                    } else {
+                        child.material = child.material.clone();
+                    }
 
+                    const materials = Array.isArray(child.material) ? child.material : [child.material];
                     for (const mat of materials) {
                         // Reduce metallic/shiny look
                         if (mat.metalness !== undefined) mat.metalness = 0.1;
