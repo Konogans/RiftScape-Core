@@ -65,7 +65,7 @@ EntityRegistry.register('brute', {
         scale: 1.0,
         animations: {
             idle: 'Idle',
-            walk: 'Walk_normal',
+            walk: 'Walking',
             run: 'Running',
             attack: 'Attack',
             death: 'Death'
@@ -119,6 +119,18 @@ EntityRegistry.register('spitter', {
     scale: 1.1,
     speed: { min: 1, max: 1.5 },
     health: { active: 2, reserve: 4 },
+	
+    model: {
+        path: 'models/Spitter.glb',
+        scale: 1.0,
+        animations: {
+            idle: 'Idle',
+            walk: 'Unsteady_Walk',
+            run: 'Running',
+            attack: 'Skill_01',
+            death: 'Death'
+        }
+    },
     
     behavior: 'ranged_kite',
     
