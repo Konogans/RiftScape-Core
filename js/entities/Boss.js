@@ -243,9 +243,20 @@ class Boss extends Enemy {
         // Flash timer logic
         if (this.flashTimer > 0) {
             this.flashTimer -= deltaTime;
-            if (this.flashTimer <= 0 && this.material) {
-                this.material.color.setHex(this.def.color || 0x222222);
-                this.material.emissive.setHex(0xff0000);
+            if (this.flashTimer <= 0) {
+                // Restore materials after flash
+                if (this.hasModel && this.modelMaterials) {
+                    for (const entry of this.modelMaterials) {
+                        const mat = entry.material;
+                        if (mat.color && entry.color !== null) mat.color.setHex(entry.color);
+                        if (mat.emissive && entry.emissive !== null) mat.emissive.setHex(entry.emissive);
+                        mat.emissiveIntensity = entry.emissiveIntensity;
+                    }
+                } else if (this.material) {
+                    // Restore cube material
+                    this.material.color.setHex(this.def.color || 0x222222);
+                    this.material.emissive.setHex(0xff0000);
+                }
             }
         }
 
