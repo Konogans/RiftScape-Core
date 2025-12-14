@@ -659,13 +659,7 @@ class Player {
 	update(deltaTime, elapsed) {
         if (this.game.dialogueSystem && this.game.dialogueSystem.isOpen) return;
 
-        // Keep updating mixer for death animation even when dead
-        if (this.dead) {
-            if (this.mixer) this.mixer.update(deltaTime);
-            return;
-        }
-
-        // Update weapon to follow bone
+        // Update weapon to follow bone (runs even when dead)
         if (this.weapon && this.weaponBone) {
             this.weaponBone.updateWorldMatrix(true, false);
             const boneWorldPos = new THREE.Vector3();
@@ -689,6 +683,12 @@ class Player {
                 const offsetQuat = new THREE.Quaternion().setFromEuler(this.weaponOffset.rotation);
                 this.weapon.quaternion.multiply(offsetQuat);
             }
+        }
+
+        // Keep updating mixer for death animation even when dead
+        if (this.dead) {
+            if (this.mixer) this.mixer.update(deltaTime);
+            return;
         }
 
         this.health.update(deltaTime);
