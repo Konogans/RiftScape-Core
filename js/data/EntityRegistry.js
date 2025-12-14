@@ -68,7 +68,7 @@ EntityRegistry.register('brute', {
             walk: 'Walking',
             run: 'Running',
             attack: 'Attack',
-            death: 'Death'
+            death: 'Dead'
         }
     },
 
@@ -128,7 +128,7 @@ EntityRegistry.register('spitter', {
             walk: 'Unsteady_Walk',
             run: 'Running',
             attack: 'Skill_01',
-            death: 'Death'
+            death: 'Dead'
         }
     },
     

@@ -26,7 +26,7 @@ CharacterRegistry.register('wanderer', {
         },
         weapon: {
             path: 'models/Magitech_Battleaxe.glb',
-            bone: 'mixamorigRightHand', // Common Mixamo bone name
+            bone: 'RightHand', // Common Mixamo bone name
             scale: 1.0,
             position: { x: 0, y: 0, z: 0 },
             rotation: { x: 0, y: 0, z: 0 }
