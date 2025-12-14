@@ -1,37 +1,169 @@
 class Boss extends Enemy {
     constructor(game, x, z, type) {
         super(game, x, z, type);
-        
+
         // 2. Boss Specifics (Match Registry)
-        this.scale = 1.8; 
+        this.scale = 1.8;
         this.mesh.scale.set(this.scale, this.scale, this.scale);
         this.mesh.position.y = 0.9; // Adjusted Y for 1.8 scale
-        
-        this.mesh.material.color.setHex(0x222222); 
-        this.mesh.material.emissive.setHex(0xff0000); 
-        
-        this.state = 'chase'; 
+
+        this.mesh.material.color.setHex(0x222222);
+        this.mesh.material.emissive.setHex(0xff0000);
+
+        this.state = 'chase';
         this.stateTimer = 0;
-        this.moveSpeed = this.speed; 
-        
+        this.moveSpeed = this.speed;
+
         // Define explicit radius for collision checks (Fat hitbox)
-        this.radius = 0.9; 
-		
+        this.radius = 0.9;
+
+        // Animation
+        this.mixer = null;
+        this.animActions = {};
+        this.currentAnim = null;
+
+        // Load model if defined
+        if (this.def.model) {
+            this.loadModel();
+        }
+
 		// NEW: MOSH WARNING RING
         // Reusing the player's Slam logic but purple and attached to the Boss
         const ringGeo = new THREE.RingGeometry(0.5, 4.5, 32); // 4.5m Radius
-        const ringMat = new THREE.MeshBasicMaterial({ 
-            color: 0xff00ff, 
-            transparent: true, 
-            opacity: 0, 
-            side: THREE.DoubleSide 
+        const ringMat = new THREE.MeshBasicMaterial({
+            color: 0xff00ff,
+            transparent: true,
+            opacity: 0,
+            side: THREE.DoubleSide
         });
         this.moshRing = new THREE.Mesh(ringGeo, ringMat);
         this.moshRing.rotation.x = -Math.PI / 2;
         this.moshRing.visible = false;
-        
+
         // Add to SCENE (not mesh) so it stays flat on floor even if boss tilts/bobs
         this.game.scene.add(this.moshRing);
+    }
+
+    async loadModel() {
+        try {
+            const loader = new THREE.GLTFLoader();
+            const modelDef = this.def.model;
+            const modelPath = typeof modelDef === 'string' ? modelDef : modelDef.path;
+
+            const glb = await new Promise((resolve, reject) => {
+                loader.load(modelPath, resolve, undefined, reject);
+            });
+
+            // Hide cube, use model
+            this.mesh.geometry.dispose();
+            this.mesh.material.dispose();
+            this.mesh.geometry = new THREE.BufferGeometry();
+            this.mesh.material.visible = false;
+
+            const model = glb.scene;
+            model.scale.setScalar(modelDef.scale || this.scale || 1.0);
+            model.position.y = -0.9; // Offset for mesh.position.y
+            model.rotation.y = Math.PI; // Face forward
+            this.mesh.add(model);
+            this.modelRoot = model;
+            this.hasModel = true;
+
+            // Store materials for flash effects and reduce shininess
+            this.modelMaterials = [];
+            model.traverse((child) => {
+                if (child.isMesh && child.material) {
+                    const materials = Array.isArray(child.material) ? child.material : [child.material];
+                    for (const mat of materials) {
+                        if (mat.metalness !== undefined) mat.metalness = 0.1;
+                        if (mat.roughness !== undefined) mat.roughness = 0.8;
+                        this.modelMaterials.push({
+                            material: mat,
+                            color: mat.color ? mat.color.getHex() : null,
+                            emissive: mat.emissive ? mat.emissive.getHex() : null,
+                            emissiveIntensity: mat.emissiveIntensity || 0
+                        });
+                    }
+                    child.castShadow = true;
+                }
+            });
+
+            // Setup animations
+            if (glb.animations && glb.animations.length > 0) {
+                this.mixer = new THREE.AnimationMixer(model);
+                const animNames = modelDef.animations || {};
+
+                glb.animations.forEach(clip => {
+                    const action = this.mixer.clipAction(clip);
+                    action.setLoop(THREE.LoopRepeat);
+                    this.animActions[clip.name] = action;
+                });
+
+                // Start with idle/walk
+                if (animNames.idle && this.animActions[animNames.idle]) {
+                    this.playAnim(animNames.idle);
+                }
+
+                console.log(`[Boss] Model loaded: ${modelPath}, animations:`, Object.keys(this.animActions));
+            }
+        } catch (e) {
+            console.warn('[Boss] Model load failed:', e);
+        }
+    }
+
+    playAnim(name, fadeTime = 0.2) {
+        if (!this.animActions || this.currentAnim === name || !this.animActions[name]) return;
+
+        const newAction = this.animActions[name];
+        const animNames = this.def.model?.animations || {};
+
+        if (this.currentAnim && this.animActions[this.currentAnim]) {
+            const oldAction = this.animActions[this.currentAnim];
+            // Stop one-shot anims
+            const oneShotAnims = [animNames.attack, animNames.death, animNames.slide];
+            if (oneShotAnims.includes(this.currentAnim)) {
+                oldAction.stop();
+            }
+            newAction.reset();
+            newAction.play();
+            newAction.crossFadeFrom(oldAction, fadeTime, true);
+        } else {
+            newAction.reset();
+            newAction.play();
+        }
+
+        this.currentAnim = name;
+    }
+
+    updateBossAnimation() {
+        if (!this.mixer || !this.def.model?.animations) return;
+
+        const animNames = this.def.model.animations;
+
+        // Death takes priority
+        if (this.dead) {
+            if (animNames.death) this.playAnim(animNames.death);
+            return;
+        }
+
+        // State-based animations
+        if (this.state === 'charge') {
+            if (animNames.charge) this.playAnim(animNames.charge);
+        } else if (this.state === 'mosh') {
+            if (animNames.mosh) this.playAnim(animNames.mosh);
+        } else if (this.state === 'recover') {
+            // Use slide animation for recovery (end of charge)
+            if (animNames.slide) this.playAnim(animNames.slide);
+            else if (animNames.idle) this.playAnim(animNames.idle);
+        } else if (this.state === 'chase') {
+            // Check if attacking
+            if (this.attackAction.status === 'windup' || this.attackAction.status === 'action') {
+                if (animNames.attack) this.playAnim(animNames.attack);
+            } else {
+                // Running/chasing
+                if (animNames.run) this.playAnim(animNames.run);
+                else if (animNames.walk) this.playAnim(animNames.walk);
+            }
+        }
     }
 	
 	// Cleanup required since we added to scene manually
@@ -46,7 +178,14 @@ class Boss extends Enemy {
     
     // Override update to use custom Boss Logic
     update(deltaTime, elapsed) {
-        if (this.dead) return;
+        // Update mixer even when dead (for death animation)
+        if (this.mixer) this.mixer.update(deltaTime);
+
+        if (this.dead) {
+            this.updateBossAnimation();
+            return;
+        }
+
         this.health.update(deltaTime);
 
         // Update attack action state machine (required for damage to be dealt)
@@ -108,15 +247,18 @@ class Boss extends Enemy {
             if (this.stateTimer <= 0) {
                 this.state = 'chase';
                 this.stateTimer = 3.0;
-                this.mesh.material.emissiveIntensity = 0.5;
+                if (!this.hasModel) this.mesh.material.emissiveIntensity = 0.5;
             }
         }
+
+        // Update animations based on state
+        this.updateBossAnimation();
     }
     
     startCharge() {
         this.state = 'charge';
         this.stateTimer = 2.0; // Charge duration
-        this.mesh.material.emissive.setHex(0xffff00); // Warning Yellow
+        if (!this.hasModel) this.mesh.material.emissive.setHex(0xffff00); // Warning Yellow
         this.game.sound.play('error'); // Telegraph Sound
 
         // Aim at current target (gate, player, or structure)
@@ -204,7 +346,7 @@ class Boss extends Enemy {
     startMosh() {
         this.state = 'mosh';
         this.stateTimer = 3.0; // Duration
-        this.mesh.material.emissive.setHex(0xff00ff); // Purple Haze
+        if (!this.hasModel) this.mesh.material.emissive.setHex(0xff00ff); // Purple Haze
         this.moshPulse = 0;
 		
 		// SHOW RING

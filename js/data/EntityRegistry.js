@@ -204,15 +204,30 @@ EntityRegistry.register('headliner', {
     color: 0x111111,
     emissive: 0xff0000,
     scale: 1.8, // REDUCED (was 2.5)
-    speed: { min: 4, max: 4 }, 
+    speed: { min: 4, max: 4 },
     health: { active: 300, reserve: 0 }, // BUFFED (was 100)
     damage: 3,
     loot: { essence: { chance: 1.0, value: 500 } },
     attackRange: 2.0, // Reduced slightly to match scale
-	
+
 	health: { active: 400, reserve: 400 },
-    
+
     attack: { type: 'melee', range: 2.5 },
     attackCooldown: 2000,
-    attackTiming: { windup: 500, action: 200, cooldown: 1000 }
+    attackTiming: { windup: 500, action: 200, cooldown: 1000 },
+
+    model: {
+        path: 'models/headliner.glb',
+        scale: 1.8,
+        animations: {
+            idle: 'Walking',       // Use walking as idle (no dedicated idle)
+            walk: 'Walking',
+            run: 'Running',
+            attack: 'Attacking',
+            charge: 'Charge',
+            slide: 'Slide',
+            mosh: 'Mosh',
+            death: 'Dead'
+        }
+    }
 });
