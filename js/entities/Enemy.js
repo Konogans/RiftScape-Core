@@ -78,11 +78,15 @@ class Enemy {
         // Pattern from mods/riftling_remastered.js (V4.4) - proven working implementation
         const gltfLoader = new THREE.GLTFLoader();
 
+        // Support both string path and object with path property
+        const modelPath = typeof this.def.model === 'string' ? this.def.model : this.def.model.path;
+        if (!modelPath) return;
+
         try {
             const glb = await new Promise((resolve, reject) => {
                 // Cache-bust to ensure unique instance per enemy
                 const cacheBuster = '?v=' + (Enemy._modelCounter = (Enemy._modelCounter || 0) + 1);
-                gltfLoader.load(this.def.model + cacheBuster, resolve, undefined, reject);
+                gltfLoader.load(modelPath + cacheBuster, resolve, undefined, reject);
             });
 
             const parent = this.mesh.parent;
