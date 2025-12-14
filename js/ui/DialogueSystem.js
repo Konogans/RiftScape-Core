@@ -635,4 +635,104 @@ class DialogueSystem {
         closeBtn.onclick = () => this.close();
         this.optionsEl.appendChild(closeBtn);
     }
+    
+    updateTrader(npc) {
+        this.optionsEl.innerHTML = ''; // Clear to prevent duplication
+        
+        this.essenceEl.textContent = `◆ ${MetaProgression.data.essence}`;
+        
+        const inventory = MetaProgression.getInventoryItems();
+        const equipmentItems = inventory.filter(item => item.type === 'equipment');
+        
+        if (equipmentItems.length === 0) {
+            const msg = document.createElement('div');
+            msg.style.color = '#666';
+            msg.style.padding = '20px';
+            msg.textContent = "You have no items to sell. Defeat enemies to find rare equipment!";
+            this.optionsEl.appendChild(msg);
+        } else {
+            // Group items by ID for display
+            const groupedItems = {};
+            equipmentItems.forEach(item => {
+                if (!groupedItems[item.id]) {
+                    groupedItems[item.id] = { id: item.id, count: 0 };
+                }
+                groupedItems[item.id].count += item.count;
+            });
+            
+            // Create section header
+            const header = document.createElement('div');
+            header.className = 'pedalboard-section';
+            header.innerHTML = `<div class="section-title">Your Inventory</div>`;
+            this.optionsEl.appendChild(header);
+            
+            // Display each item
+            Object.values(groupedItems).forEach(itemData => {
+                const equipment = EquipmentRegistry.get(itemData.id);
+                if (!equipment) return;
+                
+                const itemDiv = document.createElement('div');
+                itemDiv.className = 'pedalboard-slot';
+                
+                const sellValue = equipment.type === 'weapon' ? 50 : 25;
+                const totalValue = sellValue * itemData.count;
+                
+                itemDiv.innerHTML = `
+                    <div class="slot-label">${equipment.name} ${itemData.count > 1 ? `(x${itemData.count})` : ''}</div>
+                    <div class="current-ability">
+                        <div class="ability-name">${equipment.name}</div>
+                        <div class="ability-desc">${equipment.description || ''}</div>
+                        <div class="ability-desc" style="color:#88cc88; margin-top:4px;">
+                            Sell Value: ◆${sellValue} each (Total: ◆${totalValue})
+                        </div>
+                    </div>
+                `;
+                
+                const actionDiv = document.createElement('div');
+                actionDiv.className = 'ability-select';
+                
+                // Sell 1 button
+                if (itemData.count > 0) {
+                    const sell1Btn = document.createElement('button');
+                    sell1Btn.className = 'ability-btn';
+                    sell1Btn.textContent = `Sell 1 (◆${sellValue})`;
+                    sell1Btn.onclick = () => {
+                        const earned = MetaProgression.sellItem('equipment', itemData.id, 1);
+                        if (earned > 0) {
+                            this.game.sound.play('build');
+                            this.textEl.textContent = `Sold ${equipment.name} for ◆${earned} essence.`;
+                            this.updateTrader(npc);
+                        }
+                    };
+                    actionDiv.appendChild(sell1Btn);
+                }
+                
+                // Sell All button
+                if (itemData.count > 1) {
+                    const sellAllBtn = document.createElement('button');
+                    sellAllBtn.className = 'ability-btn';
+                    sellAllBtn.textContent = `Sell All (◆${totalValue})`;
+                    sellAllBtn.onclick = () => {
+                        const earned = MetaProgression.sellItem('equipment', itemData.id, itemData.count);
+                        if (earned > 0) {
+                            this.game.sound.play('build');
+                            this.textEl.textContent = `Sold ${itemData.count}x ${equipment.name} for ◆${earned} essence.`;
+                            this.updateTrader(npc);
+                        }
+                    };
+                    actionDiv.appendChild(sellAllBtn);
+                }
+                
+                itemDiv.appendChild(actionDiv);
+                this.optionsEl.appendChild(itemDiv);
+            });
+        }
+        
+        // Close button
+        const closeBtn = document.createElement('button');
+        closeBtn.className = 'dialogue-btn close-btn';
+        closeBtn.textContent = 'Close';
+        closeBtn.onclick = () => this.close();
+        this.optionsEl.appendChild(closeBtn);
+    }
 }
