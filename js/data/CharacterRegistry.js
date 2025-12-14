@@ -12,6 +12,19 @@ CharacterRegistry.register('wanderer', {
     description: 'Balanced survivalist.',
     color: 0x44aaff,
     stats: { moveSpeed: 0, maxHealth: 0, maxReserve: 0, attackDamage: 0, attackSpeed: 0 },
+    model: {
+        path: 'models/Wanderer.glb',
+        scale: 1.0,
+        animations: {
+            idle: 'Idle',
+            walk: 'Walking',
+            run: 'Running',
+            attack: 'Attack',
+            dash: 'RunFast',
+            slam: 'Charged_Ground_Slam',
+            death: 'Shot_and_Slow_Fall_Backward'
+        }
+    },
     // THE PEDALBOARD
     loadout: {
         primary: 'swipe',

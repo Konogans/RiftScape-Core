@@ -200,10 +200,6 @@ class Enemy {
                     }
                 }
 
-                // Debug: log detected animations
-                console.log(`[${this.def.name}] Animations:`, Object.keys(this.animActions).join(', '));
-                console.log(`[${this.def.name}] Detected: run=${this.runAnimName}, walk=${this.walkAnimName}, idle=${this.idleAnimName}, attack=${this.attackAnimName}, death=${this.deathAnimName}`);
-
                 // Start with idle (or first available locomotion)
                 this.playAnim(this.idleAnimName || this.walkAnimName || this.runAnimName || 'Idle');
             }

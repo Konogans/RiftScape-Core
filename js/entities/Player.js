@@ -62,24 +62,122 @@ class Player {
     }
     
     initMesh() {
+        // Create fallback cube mesh (always needed as container)
         const geometry = new THREE.BoxGeometry(0.6, 1, 0.6);
         this.baseMaterial = PSXify(new THREE.MeshStandardMaterial({ color: this.charDef.color || 0x44aaff, roughness: 0.4, metalness: 0.6, emissive: 0x112244, emissiveIntensity: 0.3 }));
         this.mesh = new THREE.Mesh(geometry, this.baseMaterial);
         this.mesh.position.y = 0.5;
         this.mesh.castShadow = true;
-        
+
         const indicatorGeom = new THREE.ConeGeometry(0.15, 0.3, 8);
         const indicatorMat = PSXify(new THREE.MeshStandardMaterial({ color: 0xffaa44, emissive: 0xffaa44, emissiveIntensity: 0.5 }));
         this.indicator = new THREE.Mesh(indicatorGeom, indicatorMat);
         this.indicator.rotation.x = Math.PI / 2;
         this.indicator.position.z = -0.4;
         this.mesh.add(this.indicator);
-        
+
         const attackGeom = new THREE.BoxGeometry(0.8, 0.1, 1.2);
         const attackMat = PSXify(new THREE.MeshStandardMaterial({ color: 0xffaa44, emissive: 0xffaa44, emissiveIntensity: 1, transparent: true, opacity: 0 }));
         this.attackMesh = new THREE.Mesh(attackGeom, attackMat);
         this.attackMesh.position.z = -0.8;
         this.mesh.add(this.attackMesh);
+
+        // Animation system state
+        this.hasModel = false;
+        this.mixer = null;
+        this.animActions = {};
+        this.currentAnim = null;
+        this.lastPos = { x: 0, z: 0 };
+
+        // Load model if character has one defined
+        if (this.charDef.model && this.charDef.model.path) {
+            this.loadModel();
+        }
+    }
+
+    async loadModel() {
+        try {
+            const loader = new THREE.GLTFLoader();
+            const modelDef = this.charDef.model;
+
+            const glb = await new Promise((resolve, reject) => {
+                loader.load(modelDef.path, resolve, undefined, reject);
+            });
+
+            // Hide cube, use model instead
+            this.mesh.geometry.dispose();
+            this.mesh.material.dispose();
+            this.mesh.geometry = new THREE.BufferGeometry(); // Empty geometry
+            this.mesh.material.visible = false;
+
+            // Add model as child
+            const model = glb.scene;
+            model.scale.setScalar(modelDef.scale || 1.0);
+            model.position.y = -0.5; // Adjust for mesh.position.y = 0.5
+            this.mesh.add(model);
+            this.modelRoot = model;
+            this.hasModel = true;
+
+            // Store materials for flash effects
+            this.modelMaterials = [];
+            model.traverse((child) => {
+                if (child.isMesh && child.material) {
+                    const mat = child.material;
+                    this.modelMaterials.push({
+                        material: mat,
+                        color: mat.color ? mat.color.getHex() : null,
+                        emissive: mat.emissive ? mat.emissive.getHex() : null,
+                        emissiveIntensity: mat.emissiveIntensity || 0
+                    });
+                    child.castShadow = true;
+                }
+            });
+
+            // Setup animations
+            if (glb.animations && glb.animations.length > 0) {
+                this.mixer = new THREE.AnimationMixer(model);
+                const animNames = modelDef.animations || {};
+
+                glb.animations.forEach(clip => {
+                    const action = this.mixer.clipAction(clip);
+                    action.setLoop(THREE.LoopRepeat);
+                    this.animActions[clip.name] = action;
+
+                    // One-shot animations (attack, slam, death, dash)
+                    const oneShotAnims = [animNames.attack, animNames.slam, animNames.death, animNames.dash];
+                    if (oneShotAnims.includes(clip.name)) {
+                        action.setLoop(THREE.LoopOnce, 0);
+                        action.clampWhenFinished = true;
+                    }
+                });
+
+                // Start with idle
+                if (animNames.idle && this.animActions[animNames.idle]) {
+                    this.playAnim(animNames.idle);
+                }
+            }
+        } catch (e) {
+            console.warn('[Player] Model load failed:', e);
+            // Keep cube fallback
+        }
+    }
+
+    playAnim(name, fadeTime = 0.15) {
+        if (!this.animActions || this.currentAnim === name || !this.animActions[name]) return;
+
+        const newAction = this.animActions[name];
+
+        if (this.currentAnim && this.animActions[this.currentAnim]) {
+            const oldAction = this.animActions[this.currentAnim];
+            newAction.reset();
+            newAction.play();
+            newAction.crossFadeFrom(oldAction, fadeTime, true);
+        } else {
+            newAction.reset();
+            newAction.play();
+        }
+
+        this.currentAnim = name;
     }
     
 	initHealth() {
@@ -278,27 +376,82 @@ class Player {
         }
     }
     
-    onDeath() { 
-        this.dead = true; 
-        
-        // FIX: Visual cleanup
-        this.mesh.visible = false; // Hide the player box
-        this.game.spawnParticleBurst(this.mesh.position.x, this.mesh.position.z, 0x44aaff, 20); // Big blue explosion
+    onDeath() {
+        this.dead = true;
+
         this.game.screenShake(0.4, 8); // Heavy impact shake
-        
-        this.game.triggerGameOver(); 
+
+        // Play death animation if available
+        if (this.hasModel && this.charDef.model?.animations?.death) {
+            this.playAnim(this.charDef.model.animations.death);
+
+            // Delay game over until animation plays
+            const deathAction = this.animActions[this.charDef.model.animations.death];
+            const deathDuration = deathAction ? deathAction.getClip().duration : 1.0;
+
+            setTimeout(() => {
+                this.game.spawnParticleBurst(this.mesh.position.x, this.mesh.position.z, 0x44aaff, 20);
+                this.mesh.visible = false;
+                this.game.triggerGameOver();
+            }, deathDuration * 1000);
+        } else {
+            // Fallback: immediate death
+            this.mesh.visible = false;
+            this.game.spawnParticleBurst(this.mesh.position.x, this.mesh.position.z, 0x44aaff, 20);
+            this.game.triggerGameOver();
+        }
     }
     
     flashDamage() {
-        this.baseMaterial.emissive.setHex(0xff0000); this.baseMaterial.emissiveIntensity = 1;
         this.game.screenShake(0.2, 5);
         this.game.spawnParticleBurst(this.mesh.position.x, this.mesh.position.z, 0xff4444, 6);
-        setTimeout(() => { this.baseMaterial.emissive.setHex(0x112244); this.baseMaterial.emissiveIntensity = 0.3; }, 100);
+
+        if (this.hasModel && this.modelMaterials) {
+            // Flash model white then restore
+            for (const entry of this.modelMaterials) {
+                const mat = entry.material;
+                if (mat.emissive) mat.emissive.setHex(0xffffff);
+                mat.emissiveIntensity = 5.0;
+            }
+            setTimeout(() => {
+                for (const entry of this.modelMaterials) {
+                    const mat = entry.material;
+                    if (mat.emissive) mat.emissive.setHex(entry.emissive || 0x000000);
+                    mat.emissiveIntensity = entry.emissiveIntensity;
+                }
+            }, 50);
+        } else {
+            this.baseMaterial.emissive.setHex(0xff0000);
+            this.baseMaterial.emissiveIntensity = 1;
+            setTimeout(() => {
+                this.baseMaterial.emissive.setHex(0x112244);
+                this.baseMaterial.emissiveIntensity = 0.3;
+            }, 100);
+        }
     }
-    
+
     flashHeal() {
-        this.baseMaterial.emissive.setHex(0x00ff44); this.baseMaterial.emissiveIntensity = 1;
-        setTimeout(() => { this.baseMaterial.emissive.setHex(0x112244); this.baseMaterial.emissiveIntensity = 0.3; }, 100);
+        if (this.hasModel && this.modelMaterials) {
+            for (const entry of this.modelMaterials) {
+                const mat = entry.material;
+                if (mat.emissive) mat.emissive.setHex(0x00ff44);
+                mat.emissiveIntensity = 3.0;
+            }
+            setTimeout(() => {
+                for (const entry of this.modelMaterials) {
+                    const mat = entry.material;
+                    if (mat.emissive) mat.emissive.setHex(entry.emissive || 0x000000);
+                    mat.emissiveIntensity = entry.emissiveIntensity;
+                }
+            }, 100);
+        } else {
+            this.baseMaterial.emissive.setHex(0x00ff44);
+            this.baseMaterial.emissiveIntensity = 1;
+            setTimeout(() => {
+                this.baseMaterial.emissive.setHex(0x112244);
+                this.baseMaterial.emissiveIntensity = 0.3;
+            }, 100);
+        }
     }
     
     applyBuff(type, multiplier, duration) {
@@ -530,9 +683,66 @@ class Player {
             updateSlot(this.actions.utility, 'slot_utility');
             updateSlot(this.actions.mastery, 'slot_mastery');
         }
-        
-        const bobAmount = (this.actions.primary && this.actions.primary.status === 'idle' && !this.velocityOverride) ? 0.03 : 0.01;
-        this.mesh.position.y = 0.5 + Math.sin(elapsed * 3) * bobAmount;
+
+        // 5. ANIMATION STATE MACHINE
+        if (this.mixer) {
+            this.mixer.update(deltaTime);
+            this.updatePlayerAnimation(deltaTime);
+        } else {
+            // Fallback bob animation for cube
+            const bobAmount = (this.actions.primary && this.actions.primary.status === 'idle' && !this.velocityOverride) ? 0.03 : 0.01;
+            this.mesh.position.y = 0.5 + Math.sin(elapsed * 3) * bobAmount;
+        }
+    }
+
+    updatePlayerAnimation(deltaTime) {
+        if (!this.hasModel || !this.charDef.model) return;
+
+        const animNames = this.charDef.model.animations;
+        if (!animNames) return;
+
+        // Priority: Death > Dash > Slam > Attack > Run/Walk/Idle
+
+        // Check for special ability animations
+        const mobilityAction = this.actions.mobility;
+        const secondaryAction = this.actions.secondary;
+        const primaryAction = this.actions.primary;
+
+        // Dash animation (mobility in windup or action)
+        if (mobilityAction && (mobilityAction.status === 'windup' || mobilityAction.status === 'action')) {
+            if (animNames.dash) this.playAnim(animNames.dash);
+            return;
+        }
+
+        // Slam animation (secondary in windup or action, if it's the slam ability)
+        if (secondaryAction && secondaryAction.def && secondaryAction.def.name === 'Ground Slam') {
+            if (secondaryAction.status === 'windup' || secondaryAction.status === 'action') {
+                if (animNames.slam) this.playAnim(animNames.slam);
+                return;
+            }
+        }
+
+        // Attack animation (primary in windup or action)
+        if (primaryAction && (primaryAction.status === 'windup' || primaryAction.status === 'action')) {
+            if (animNames.attack) this.playAnim(animNames.attack);
+            return;
+        }
+
+        // Locomotion based on actual speed
+        const pos = this.mesh.position;
+        const dx = pos.x - (this.lastPos?.x || pos.x);
+        const dz = pos.z - (this.lastPos?.z || pos.z);
+        const distMoved = Math.sqrt(dx * dx + dz * dz);
+        const actualSpeed = distMoved / Math.max(deltaTime, 0.001);
+        this.lastPos = { x: pos.x, z: pos.z };
+
+        if (actualSpeed > 3.0 && animNames.run) {
+            this.playAnim(animNames.run);
+        } else if (actualSpeed > 0.5 && animNames.walk) {
+            this.playAnim(animNames.walk);
+        } else if (animNames.idle) {
+            this.playAnim(animNames.idle);
+        }
     }
 	
 	updateEssenceUI() {
