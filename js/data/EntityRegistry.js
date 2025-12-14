@@ -220,7 +220,7 @@ EntityRegistry.register('headliner', {
         path: 'models/headliner.glb',
         scale: 1.8,
         animations: {
-            idle: 'Walking',
+            idle: 'Idle',
             walk: 'Walking',
             run: 'Running',        // Used for charge
             attack: 'Attacking',

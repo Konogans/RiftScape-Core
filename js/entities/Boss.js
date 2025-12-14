@@ -105,7 +105,39 @@ class Boss extends Enemy {
                     this.animActions[clip.name] = action;
                 });
 
-                // Start with idle/walk
+                // Configure attack animation (like Enemy.js)
+                if (animNames.attack && this.animActions[animNames.attack]) {
+                    const action = this.animActions[animNames.attack];
+                    action.setLoop(THREE.LoopOnce, 0);
+                    action.clampWhenFinished = true;
+
+                    // Sync with attack timing
+                    if (this.def.attackTiming) {
+                        const t = this.def.attackTiming;
+                        const totalDuration = (t.windup + t.action + t.cooldown) / 1000;
+                        const timeScale = action.getClip().duration / totalDuration;
+                        this.attackTimeScale = timeScale;
+                        action.setEffectiveTimeScale(timeScale);
+                    }
+                }
+
+                // Configure mosh animation - sync with mosh duration (3 seconds)
+                if (animNames.mosh && this.animActions[animNames.mosh]) {
+                    const action = this.animActions[animNames.mosh];
+                    const moshDuration = 3.0; // matches stateTimer in startMosh
+                    const timeScale = action.getClip().duration / moshDuration;
+                    this.moshTimeScale = timeScale;
+                    action.setEffectiveTimeScale(timeScale);
+                }
+
+                // Configure death animation
+                if (animNames.death && this.animActions[animNames.death]) {
+                    const action = this.animActions[animNames.death];
+                    action.setLoop(THREE.LoopOnce, 0);
+                    action.clampWhenFinished = true;
+                }
+
+                // Start with idle
                 if (animNames.idle && this.animActions[animNames.idle]) {
                     this.playAnim(animNames.idle);
                 }
@@ -123,10 +155,10 @@ class Boss extends Enemy {
         const newAction = this.animActions[name];
         const animNames = this.def.model?.animations || {};
 
+        // Stop previous one-shot anims
         if (this.currentAnim && this.animActions[this.currentAnim]) {
             const oldAction = this.animActions[this.currentAnim];
-            // Stop one-shot anims
-            const oneShotAnims = [animNames.attack, animNames.death, animNames.slide];
+            const oneShotAnims = [animNames.attack, animNames.death];
             if (oneShotAnims.includes(this.currentAnim)) {
                 oldAction.stop();
             }
@@ -136,6 +168,14 @@ class Boss extends Enemy {
         } else {
             newAction.reset();
             newAction.play();
+        }
+
+        // Re-apply timeScale after reset() clears it
+        if (name === animNames.attack && this.attackTimeScale) {
+            newAction.setEffectiveTimeScale(this.attackTimeScale);
+        }
+        if (name === animNames.mosh && this.moshTimeScale) {
+            newAction.setEffectiveTimeScale(this.moshTimeScale);
         }
 
         this.currentAnim = name;
@@ -159,9 +199,8 @@ class Boss extends Enemy {
         } else if (this.state === 'mosh') {
             if (animNames.mosh) this.playAnim(animNames.mosh);
         } else if (this.state === 'recover') {
-            // Use walk/idle for recovery
-            if (animNames.walk) this.playAnim(animNames.walk);
-            else if (animNames.idle) this.playAnim(animNames.idle);
+            // Use idle for recovery (panting/vulnerable)
+            if (animNames.idle) this.playAnim(animNames.idle);
         } else if (this.state === 'chase') {
             // Check if attacking
             if (this.attackAction.status === 'windup' || this.attackAction.status === 'action') {
@@ -169,7 +208,6 @@ class Boss extends Enemy {
             } else {
                 // Walking while chasing
                 if (animNames.walk) this.playAnim(animNames.walk);
-                else if (animNames.idle) this.playAnim(animNames.idle);
             }
         }
     }
