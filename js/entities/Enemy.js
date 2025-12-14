@@ -581,11 +581,17 @@ class Enemy {
         // Legacy animController fallback
         if (this.animController) this.animController.dispose();
 
-        // Cleanup all mesh children (eyes, model parts, etc.)
+        // Cleanup mesh resources
         if (this.mesh) {
             this.mesh.traverse((child) => {
                 if (child.isMesh) {
-                    if (child.geometry) child.geometry.dispose();
+                    // IMPORTANT: Don't dispose geometry for cached models!
+                    // SkeletonUtils.clone() shares geometry references with the cache.
+                    // Disposing them breaks all future clones from that cache.
+                    if (!this.hasModel && child.geometry) {
+                        child.geometry.dispose();
+                    }
+                    // Materials are cloned per-instance, so safe to dispose
                     if (child.material) {
                         if (child.material.map) child.material.map.dispose();
                         child.material.dispose();
