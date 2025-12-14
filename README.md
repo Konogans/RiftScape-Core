@@ -2,6 +2,8 @@
 
 A vanilla JavaScript, browser-based, **"Punk Rock Coding"** engine built on THREE.js (r147). RiftScape is a fast-paced, grid-based action RPG that also shares a blend of survival and survivor elements.
 
+**🎮 [Play RiftScape](https://riftscape.io)** | **📦 [itch.io Page](https://wizewizardgames.itch.io/riftscape)** | **💻 [Source Code](https://github.com/Konogans/RiftScape-Core)**
+
 ## 🚀 Getting Started
 
 RiftScape requires **NO** local build steps, compilers, or Node.js dependencies. It runs directly in the browser via a local server.
@@ -74,15 +76,17 @@ This approach, where you treat temporary .js files dropped into the running game
 
 -----
 
-## 💻 Development Checklist (TODO/BUGS)
+## 💻 Development Status
 
-For the current development status, please consult the `STATUS.md` file.
+For detailed status information, please consult the `STATUS.md` file.
 
 | Status | Item |
 | :--- | :--- |
-| **CRITICAL** | **Animation Integration:** Player/Enemy models need stable animation synchronization, starting with Player as the base case. |
-| **TODO** | **Custom Sounds:** Upgrade `SoundSystem.js` to support loading external audio files (e.g., MP3 boss theme). |
-| **BUGS** | **B-002:** Boss `moshRing` memory leak in `dispose()` method. |
+| **MVP Status** | **~95% Complete** - Core systems fully functional, only Pedalboard UI customization remains. |
+| **Animation System** | ✅ **COMPLETE** - Enemy and player animation synchronization integrated. |
+| **Sound System** | ✅ **COMPLETE** - Music loading and procedural SFX fully implemented. |
+| **Bugs** | ✅ **ALL RESOLVED** - All documented bugs have been fixed. |
+| **Remaining Work** | **Pedalboard Customization UI** - Allow players to customize ability loadouts in the Outpost. |
 
 -----
 

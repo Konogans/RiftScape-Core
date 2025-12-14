@@ -121,8 +121,11 @@ class PlayerProjectile {
         // ENEMY COLLISION
         for (const e of this.game.enemies) {
             if (e.dead) continue;
+            const enemyRadius = e.radius || 0.6;
+            const projectileRadius = this.size || 0.25;
+            const hitDist = enemyRadius + projectileRadius;
             const distSq = (e.mesh.position.x - nextX)**2 + (e.mesh.position.z - nextZ)**2;
-            if (distSq < 0.6) { 
+            if (distSq < hitDist * hitDist) { 
                 e.takeDamage(this.damage);
                 this.destroy(); // FIX: Call destroy
                 return;

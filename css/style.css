@@ -184,3 +184,48 @@ canvas {
 .dialogue-btn.disabled .desc {
     color: #555;
 }
+
+/* FOOTER */
+#game-footer {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    width: 100%;
+    background: rgba(0, 0, 0, 0.6);
+    border-top: 1px solid rgba(68, 102, 136, 0.3);
+    padding: 8px 20px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 11px;
+    color: #667;
+    z-index: 50;
+    pointer-events: auto;
+    font-family: 'Courier New', monospace;
+}
+
+.footer-links {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.footer-links a {
+    color: #88aacc;
+    text-decoration: none;
+    transition: color 0.2s;
+}
+
+.footer-links a:hover {
+    color: #aaccff;
+    text-decoration: underline;
+}
+
+.footer-links .separator {
+    color: #445;
+}
+
+.footer-copyright {
+    color: #556;
+    font-size: 10px;
+}

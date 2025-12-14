@@ -16,7 +16,9 @@ class Projectile {
         this.mesh.position.z += this.velZ * deltaTime;
         
         // 1. CHECK PLAYER COLLISION
-        if (this.mesh.position.distanceTo(this.game.player.mesh.position) < 0.5) {
+        const playerRadius = this.game.player.radius || 0.5;
+        const projectileRadius = 0.15;
+        if (this.mesh.position.distanceTo(this.game.player.mesh.position) < playerRadius + projectileRadius) {
             if (!this.game.player.isInvulnerable) {
                 // Now using the standardized takeDamage method we added
                 this.game.player.takeDamage(this.damage);
