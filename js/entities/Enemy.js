@@ -80,39 +80,33 @@ class Enemy {
         if (!modelPath) return;
 
         try {
-            // Use model cache to avoid re-parsing GLB for each enemy
-            if (!Enemy._modelCache) Enemy._modelCache = {};
-            if (!Enemy._modelLoading) Enemy._modelLoading = {};
+            // Cache raw GLB data (ArrayBuffer) to avoid network requests
+            // Each enemy gets a fresh parse - avoids all cloning issues
+            if (!Enemy._glbCache) Enemy._glbCache = {};
+            if (!Enemy._glbLoading) Enemy._glbLoading = {};
 
-            let cached = Enemy._modelCache[modelPath];
+            let arrayBuffer = Enemy._glbCache[modelPath];
 
-            if (!cached) {
-                // Check if another enemy is already loading this model
-                if (Enemy._modelLoading[modelPath]) {
-                    // Wait for the other load to complete
-                    cached = await Enemy._modelLoading[modelPath];
+            if (!arrayBuffer) {
+                // Check if another enemy is already fetching this model
+                if (Enemy._glbLoading[modelPath]) {
+                    arrayBuffer = await Enemy._glbLoading[modelPath];
                 } else {
-                    // First time loading - create promise and store it
-                    Enemy._modelLoading[modelPath] = (async () => {
-                        const gltfLoader = new THREE.GLTFLoader();
-                        const glb = await new Promise((resolve, reject) => {
-                            gltfLoader.load(modelPath, resolve, undefined, reject);
-                        });
+                    // First time - fetch and cache the raw GLB data
+                    Enemy._glbLoading[modelPath] = fetch(modelPath)
+                        .then(response => response.arrayBuffer());
 
-                        // Store a pristine template scene (never attached to DOM)
-                        // and the animations for reuse
-                        const template = {
-                            scene: glb.scene,
-                            animations: glb.animations
-                        };
-                        Enemy._modelCache[modelPath] = template;
-                        return template;
-                    })();
-
-                    cached = await Enemy._modelLoading[modelPath];
-                    delete Enemy._modelLoading[modelPath];
+                    arrayBuffer = await Enemy._glbLoading[modelPath];
+                    Enemy._glbCache[modelPath] = arrayBuffer;
+                    delete Enemy._glbLoading[modelPath];
                 }
             }
+
+            // Parse GLB from cached ArrayBuffer (fresh scene for each enemy)
+            const gltfLoader = new THREE.GLTFLoader();
+            const glb = await new Promise((resolve, reject) => {
+                gltfLoader.parse(arrayBuffer, '', resolve, reject);
+            });
 
             const parent = this.mesh.parent;
             if (!this.game.entities.includes(this) && !parent) return;
@@ -124,32 +118,18 @@ class Enemy {
                 if (this.material) this.material.dispose();
             }
 
-            // Clone the cached template for this instance
-            // Use SkeletonUtils for skinned meshes (properly clones skeleton/bones)
-            if (THREE.SkeletonUtils) {
-                this.mesh = THREE.SkeletonUtils.clone(cached.scene);
-            } else {
-                console.warn('[Enemy] SkeletonUtils not available, model cloning may fail');
-                this.mesh = cached.scene.clone(true);
-            }
-            this.glbAnimations = cached.animations; // Store for mixer setup
+            // Use the freshly parsed scene directly (no cloning needed)
+            this.mesh = glb.scene;
+            this.glbAnimations = glb.animations;
             this.mesh.position.set(x, 0, z);
             this.mesh.scale.setScalar(scale);
             this.hasModel = true;
             this.baseY = 0;
 
-            // Clone materials for this instance (so disposal doesn't affect cache)
-            // and store for flash effects
+            // Store materials for flash effects (each enemy owns its own from fresh parse)
             this.modelMaterials = [];
             this.mesh.traverse((child) => {
                 if (child.isMesh && child.material) {
-                    // Clone materials to avoid shared reference issues
-                    if (Array.isArray(child.material)) {
-                        child.material = child.material.map(m => m.clone());
-                    } else {
-                        child.material = child.material.clone();
-                    }
-
                     const materials = Array.isArray(child.material) ? child.material : [child.material];
                     for (const mat of materials) {
                         // Reduce metallic/shiny look
@@ -604,16 +584,12 @@ class Enemy {
         if (this.animController) this.animController.dispose();
 
         // Cleanup mesh resources
+        // Each enemy now gets a fresh parse from cached ArrayBuffer,
+        // so each owns its geometry and can safely dispose it
         if (this.mesh) {
             this.mesh.traverse((child) => {
                 if (child.isMesh) {
-                    // IMPORTANT: Don't dispose geometry for cached models!
-                    // SkeletonUtils.clone() shares geometry references with the cache.
-                    // Disposing them breaks all future clones from that cache.
-                    if (!this.hasModel && child.geometry) {
-                        child.geometry.dispose();
-                    }
-                    // Materials are cloned per-instance, so safe to dispose
+                    if (child.geometry) child.geometry.dispose();
                     if (child.material) {
                         if (child.material.map) child.material.map.dispose();
                         child.material.dispose();
