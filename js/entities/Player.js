@@ -119,6 +119,10 @@ class Player {
             this.modelRoot = model;
             this.hasModel = true;
 
+            // Hide debug visuals (indicator cone, attack mesh)
+            if (this.indicator) this.indicator.visible = false;
+            if (this.attackMesh) this.attackMesh.visible = false;
+
             // Store materials for flash effects
             this.modelMaterials = [];
             model.traverse((child) => {

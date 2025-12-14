@@ -272,6 +272,17 @@ class Enemy {
     
     takeDamage(amount) {
         if (this.dead) return;
+
+        // Floating damage text (show even on killing blows)
+        if (this.game.spawnFloatingText) {
+            this.game.spawnFloatingText(
+                this.mesh.position.x,
+                this.mesh.position.z,
+                `-${amount}`,
+                0xff4444
+            );
+        }
+
         this.health.delta(-amount);
 
         // Skip flash if this hit killed us (onDeath already triggered)
@@ -292,16 +303,6 @@ class Enemy {
         }
 
         this.flashTimer = 0.05; // Quick pulse
-
-        // Floating damage text
-        if (this.game.spawnFloatingText) {
-            this.game.spawnFloatingText(
-                this.mesh.position.x,
-                this.mesh.position.z,
-                `-${amount}`,
-                0xff4444
-            );
-        }
     }
     
     onDeath() {
