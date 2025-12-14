@@ -267,6 +267,7 @@ class Player {
                 this.weapon = weapon;
                 this.weaponBone = targetBone;
                 console.log(`[Player] Weapon loaded, will follow ${weaponDef.bone}`);
+                console.log(`[Player] Use game.player.tweakWeapon(x,y,z, rx,ry,rz) to adjust position/rotation`);
             } else {
                 console.warn(`[Player] Attachment point '${weaponDef.bone}' not found. Available objects:`);
                 model.traverse((child) => {
@@ -276,6 +277,19 @@ class Player {
         } catch (e) {
             console.warn('[Player] Weapon load failed:', e);
         }
+    }
+
+    // Debug helper to adjust weapon position/rotation
+    tweakWeapon(x = 0, y = 0, z = 0, rx = 0, ry = 0, rz = 0) {
+        if (!this.weaponOffset) {
+            console.warn('[Player] No weapon loaded');
+            return;
+        }
+        this.weaponOffset.position.set(x, y, z);
+        this.weaponOffset.rotation.set(rx, ry, rz);
+        console.log(`[Player] Weapon offset updated. Copy to CharacterRegistry:`);
+        console.log(`position: { x: ${x}, y: ${y}, z: ${z} },`);
+        console.log(`rotation: { x: ${rx}, y: ${ry}, z: ${rz} }`);
     }
 
     playAnim(name, fadeTime = 0.15) {
