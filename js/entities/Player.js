@@ -208,6 +208,18 @@ class Player {
             const weapon = glb.scene;
             weapon.scale.setScalar(weaponDef.scale || 1.0);
 
+            // Debug: check weapon contents
+            let meshCount = 0;
+            weapon.traverse((child) => {
+                if (child.isMesh) {
+                    meshCount++;
+                    child.geometry.computeBoundingBox();
+                    const box = child.geometry.boundingBox;
+                    console.log(`[Player] Weapon mesh: ${child.name}, bounds:`, box.min, box.max);
+                }
+            });
+            console.log(`[Player] Weapon has ${meshCount} meshes, scale: ${weaponDef.scale || 1.0}`);
+
             // Find the bone/object to attach to
             let targetBone = null;
             model.traverse((child) => {
