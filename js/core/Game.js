@@ -314,6 +314,10 @@ if (this.enemies.length >= this.maxEnemies) return;
             this.entities.push(builder); this.scene.add(builder.mesh);
         }
 		
+		// Pedalboard Customizer (Always available)
+		const pedalboardNPC = new NPC(this, 8, 0, "The Tinkerer", "pedalboard", 0xaa88ff);
+		this.entities.push(pedalboardNPC); this.scene.add(pedalboardNPC.mesh);
+		
 		// The Forgotten (Always there)
 		const resetNPC = new NPC(this, 0, -8, "The Forgotten", "reset", 0x333333);
 		this.entities.push(resetNPC); this.scene.add(resetNPC.mesh);
@@ -414,6 +418,7 @@ if (this.enemies.length >= this.maxEnemies) return;
             if (unlocked.includes('smith')) targets.push({ x: 5, z: 5, name: "Garrick (Smith)" });
             if (unlocked.includes('scribe')) targets.push({ x: -5, z: 5, name: "Elara (Scribe)" });
 			if (unlocked.includes('builder')) targets.push({ x: 0, z: 8, name: "Kael (Architect)" });
+			targets.push({ x: 8, z: 0, name: "The Tinkerer" }); // Always available
             
             // Optional: Point to reset NPC if you want
             // targets.push({ x: 0, z: -8, name: "The Forgotten" });
@@ -561,7 +566,7 @@ if (this.enemies.length >= this.maxEnemies) return;
             nodeInfo = ` | ${node.name} [Depth: ${dist}m] Lvl:${node.level}`;
         }
         
-        this.hud.updateDebug(`RiftScape v3.0 CANVAS HUD\n${BiomeRegistry.get(this.currentBiome).name}\nEntities: ${this.entities.length}\nFPS: ${(1/dt).toFixed(0)} ${buffList} ${nodeInfo}`);
+        this.hud.updateDebug(`RiftScape v3.1 CANVAS HUD\n${BiomeRegistry.get(this.currentBiome).name}\nEntities: ${this.entities.length}\nFPS: ${(1/dt).toFixed(0)} ${buffList} ${nodeInfo}`);
         
         this.renderer.render(this.scene, this.camera);
         if (this.hud) this.hud.render(this.renderer);

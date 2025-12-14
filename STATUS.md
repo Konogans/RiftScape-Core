@@ -2,7 +2,7 @@
 
 ## 🎸 RiftScape Engine Status & Roadmap
 
-This document outlines the architecture, current state, and remaining development priorities for the RiftScape core engine (v3.0).
+This document outlines the architecture, current state, and remaining development priorities for the RiftScape core engine (v3.1).
 
 ---
 

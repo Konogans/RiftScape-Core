@@ -154,7 +154,9 @@ const MetaProgression = {
         magicAffinity: 0, techAffinity: 0, upgrades: {}, 
         // NEW: Identity Tracking
         currentCharacter: 'wanderer', 
-        unlockedCharacters: ['wanderer'] // Everyone starts as Wanderer
+        unlockedCharacters: ['wanderer'], // Everyone starts as Wanderer
+        // NEW: Custom Loadouts (per character)
+        customLoadouts: {} // Format: { characterId: { primary: 'swipe', secondary: 'slam', ... } }
     },
     save() {
         try { localStorage.setItem('riftscape_meta', JSON.stringify(this.data)); } 
@@ -171,7 +173,8 @@ const MetaProgression = {
             essence: 0, totalEssence: 0, runs: 0, bestTime: 0, bestKills: 0,
             magicAffinity: 0, techAffinity: 0, upgrades: {}, 
             currentCharacter: 'wanderer',
-            unlockedCharacters: ['wanderer']
+            unlockedCharacters: ['wanderer'],
+            customLoadouts: {}
         };
         this.save();
     },

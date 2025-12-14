@@ -31,6 +31,8 @@ class DialogueSystem {
 		const greetings = {
 			smith: "The flesh is weak. Improve the hardware.",
 			scribe: "Knowledge is power. Expand your mind.",
+			builder: "The battlefield is a canvas. Build your defenses.",
+			pedalboard: "Customize your loadout. Each slot defines your combat style.",
 			'reset': "To begin again is to lose everything. Are you certain?" // NEW
 		};
 		return greetings[role] || "Greetings.";
@@ -39,6 +41,12 @@ class DialogueSystem {
     updateShop(npc) {
         this.essenceEl.textContent = `◆ ${MetaProgression.data.essence}`;
         this.optionsEl.innerHTML = '';
+        
+        // PEDALBOARD UI for Pedalboard Customizer
+        if (npc.role === 'pedalboard') {
+            this.updatePedalboard(npc);
+            return;
+        }
         
         const allUpgrades = UpgradeRegistry.list();
         
@@ -58,6 +66,12 @@ class DialogueSystem {
             shopInventory = allUpgrades.filter(u => 
                 // Added 'slam_unlock'
                 ['slam_unlock', 'magic_regen', 'magic_burst'].includes(u.id)
+            );
+        } else if (npc.role === 'builder') {
+            // Architect shop - structure/defense related upgrades
+            shopInventory = allUpgrades.filter(u => 
+                // Add structure-related upgrades here when they exist
+                ['dash_unlock'].includes(u.id) // Placeholder - add actual builder upgrades
             );
         } else if (npc.role === 'reset') {
 			
@@ -292,5 +306,137 @@ class DialogueSystem {
             this.close(); 
         };
         this.optionsEl.appendChild(btnEnd);
+    }
+    
+    updatePedalboard(npc) {
+        // Clear existing content first to prevent duplication
+        this.optionsEl.innerHTML = '';
+        
+        const charId = MetaProgression.data.currentCharacter;
+        const charDef = CharacterRegistry.get(charId);
+        const customLoadout = MetaProgression.data.customLoadouts && MetaProgression.data.customLoadouts[charId];
+        const currentLoadout = customLoadout || charDef.loadout || {};
+        
+        const slots = [
+            { id: 'primary', label: 'Primary Attack', required: true },
+            { id: 'secondary', label: 'Secondary', required: false },
+            { id: 'mobility', label: 'Mobility', required: true },
+            { id: 'utility', label: 'Utility', required: false },
+            { id: 'mastery', label: 'Mastery', required: false }
+        ];
+        
+        // Get available abilities by type
+        const getAbilitiesByType = (type) => {
+            return AbilityRegistry.list().filter(a => a.type === type);
+        };
+        
+        slots.forEach(slot => {
+            const slotDiv = document.createElement('div');
+            slotDiv.className = 'pedalboard-slot';
+            slotDiv.innerHTML = `<div class="slot-label">${slot.label}</div>`;
+            
+            const currentAbilityId = currentLoadout[slot.id];
+            const currentAbility = currentAbilityId ? AbilityRegistry.get(currentAbilityId) : null;
+            
+            // Current ability display
+            const currentDiv = document.createElement('div');
+            currentDiv.className = 'current-ability';
+            if (currentAbility) {
+                currentDiv.innerHTML = `
+                    <div class="ability-name">${currentAbility.name}</div>
+                    <div class="ability-desc">${currentAbility.description || ''}</div>
+                `;
+            } else {
+                currentDiv.innerHTML = '<div class="ability-name" style="color:#666">Empty</div>';
+            }
+            slotDiv.appendChild(currentDiv);
+            
+            // Ability selection buttons
+            const abilities = getAbilitiesByType(slot.id);
+            if (abilities.length > 0) {
+                const selectDiv = document.createElement('div');
+                selectDiv.className = 'ability-select';
+                
+                abilities.forEach(ability => {
+                    const btn = document.createElement('button');
+                    btn.className = 'ability-btn';
+                    if (currentAbilityId === ability.id) {
+                        btn.classList.add('selected');
+                    }
+                    btn.textContent = ability.name;
+                    btn.title = ability.description || '';
+                    btn.onclick = () => {
+                        // Save to custom loadout
+                        if (!MetaProgression.data.customLoadouts) {
+                            MetaProgression.data.customLoadouts = {};
+                        }
+                        if (!MetaProgression.data.customLoadouts[charId]) {
+                            MetaProgression.data.customLoadouts[charId] = {};
+                        }
+                        MetaProgression.data.customLoadouts[charId][slot.id] = ability.id;
+                        MetaProgression.save();
+                        
+                        // Refresh UI
+                        this.updatePedalboard(npc);
+                        
+                        // Reload player loadout if in hub
+                        if (this.game.player && this.game.inOutpost) {
+                            this.game.player.initLoadout();
+                        }
+                    };
+                    selectDiv.appendChild(btn);
+                });
+                
+                // Clear button (always show to prevent layout shifts, but disable when empty)
+                const clearBtn = document.createElement('button');
+                clearBtn.className = 'ability-btn clear-btn';
+                clearBtn.textContent = 'Clear';
+                if (!currentAbilityId) {
+                    clearBtn.disabled = true;
+                } else {
+                    clearBtn.onclick = () => {
+                        if (MetaProgression.data.customLoadouts && MetaProgression.data.customLoadouts[charId]) {
+                            delete MetaProgression.data.customLoadouts[charId][slot.id];
+                            if (Object.keys(MetaProgression.data.customLoadouts[charId]).length === 0) {
+                                delete MetaProgression.data.customLoadouts[charId];
+                            }
+                            MetaProgression.save();
+                            this.updatePedalboard(npc);
+                            if (this.game.player && this.game.inOutpost) {
+                                this.game.player.initLoadout();
+                            }
+                        }
+                    };
+                }
+                selectDiv.appendChild(clearBtn);
+                
+                slotDiv.appendChild(selectDiv);
+            }
+            
+            this.optionsEl.appendChild(slotDiv);
+        });
+        
+        // Reset to default button
+        const resetBtn = document.createElement('button');
+        resetBtn.className = 'dialogue-btn';
+        resetBtn.innerHTML = '<div class="header">Reset to Default</div><div class="desc">Restore character\'s default loadout.</div>';
+        resetBtn.onclick = () => {
+            if (MetaProgression.data.customLoadouts && MetaProgression.data.customLoadouts[charId]) {
+                delete MetaProgression.data.customLoadouts[charId];
+                MetaProgression.save();
+                this.updatePedalboard(npc);
+                if (this.game.player && this.game.inOutpost) {
+                    this.game.player.initLoadout();
+                }
+            }
+        };
+        this.optionsEl.appendChild(resetBtn);
+        
+        // Close button
+        const closeBtn = document.createElement('button');
+        closeBtn.className = 'dialogue-btn close-btn';
+        closeBtn.textContent = 'Close';
+        closeBtn.onclick = () => this.close();
+        this.optionsEl.appendChild(closeBtn);
     }
 }

@@ -33,7 +33,10 @@ class Player {
     }
     
 	initLoadout() {
-        const loadoutDef = this.charDef.loadout || {};
+        // Check for custom loadout first, then fall back to default
+        const charId = MetaProgression.data.currentCharacter;
+        const customLoadout = MetaProgression.data.customLoadouts && MetaProgression.data.customLoadouts[charId];
+        const loadoutDef = customLoadout || this.charDef.loadout || {};
         const slots = ['primary', 'secondary', 'mobility', 'utility', 'mastery'];
         
         slots.forEach(slot => {
