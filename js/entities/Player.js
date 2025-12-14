@@ -680,8 +680,11 @@ class Player {
                 this.weapon.position.add(this.weaponOffset.position);
             }
 
-            // Apply bone rotation + offset
-            this.weapon.quaternion.copy(boneWorldQuat);
+            // Apply bone rotation + offset (convert world to local space)
+            const meshWorldQuat = new THREE.Quaternion();
+            this.mesh.getWorldQuaternion(meshWorldQuat);
+            meshWorldQuat.invert();
+            this.weapon.quaternion.copy(meshWorldQuat).multiply(boneWorldQuat);
             if (this.weaponOffset) {
                 const offsetQuat = new THREE.Quaternion().setFromEuler(this.weaponOffset.rotation);
                 this.weapon.quaternion.multiply(offsetQuat);
