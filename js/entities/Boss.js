@@ -205,6 +205,9 @@ class Boss extends Enemy {
             // Check if attacking
             if (this.attackAction.status === 'windup' || this.attackAction.status === 'action') {
                 if (animNames.attack) this.playAnim(animNames.attack);
+            } else if (this.inRange) {
+                // In range but not attacking - idle
+                if (animNames.idle) this.playAnim(animNames.idle);
             } else {
                 // Walking while chasing
                 if (animNames.walk) this.playAnim(animNames.walk);
@@ -266,7 +269,8 @@ class Boss extends Enemy {
         if (this.state === 'chase') {
             // Standard Chase (Gate Priority)
             const result = BehaviorSystem.execute(this, 'chase', deltaTime, this.game);
-            
+            this.inRange = result.inRange; // Store for animation
+
             // Trigger Special Moves randomly
             if (this.stateTimer <= 0) {
                 const roll = Math.random();
@@ -274,7 +278,7 @@ class Boss extends Enemy {
                 else if (roll < 0.7) this.startMosh();
                 else this.stateTimer = 2.0; // Keep chasing
             }
-            
+
             // Melee Attack (if close)
             if (result.inRange && this.attackCooldown <= 0) {
                 this.attackAction.trigger();
