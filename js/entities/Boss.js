@@ -49,28 +49,33 @@ class Boss extends Enemy {
             const loader = new THREE.GLTFLoader();
             const modelDef = this.def.model;
             const modelPath = typeof modelDef === 'string' ? modelDef : modelDef.path;
+            const x = this.mesh.position.x;
+            const z = this.mesh.position.z;
+            const scale = modelDef.scale || this.scale || 1.8;
 
             const glb = await new Promise((resolve, reject) => {
-                loader.load(modelPath, resolve, undefined, reject);
+                const cacheBuster = '?v=' + Date.now();
+                loader.load(modelPath + cacheBuster, resolve, undefined, reject);
             });
 
-            // Hide cube, use model
-            this.mesh.geometry.dispose();
-            this.mesh.material.dispose();
-            this.mesh.geometry = new THREE.BufferGeometry();
-            this.mesh.material.visible = false;
+            // Store parent before replacing mesh
+            const parent = this.mesh.parent;
+            if (!parent) return;
 
-            const model = glb.scene;
-            model.scale.setScalar(modelDef.scale || this.scale || 1.0);
-            model.position.y = -0.9; // Offset for mesh.position.y
-            model.rotation.y = Math.PI; // Face forward
-            this.mesh.add(model);
-            this.modelRoot = model;
+            // Cleanup old mesh completely (like Enemy.js)
+            parent.remove(this.mesh);
+            if (this.mesh.geometry) this.mesh.geometry.dispose();
+            if (this.mesh.material) this.mesh.material.dispose();
+
+            // Replace mesh with GLB scene
+            this.mesh = glb.scene;
+            this.mesh.position.set(x, 0, z);
+            this.mesh.scale.setScalar(scale);
             this.hasModel = true;
 
             // Store materials for flash effects and reduce shininess
             this.modelMaterials = [];
-            model.traverse((child) => {
+            this.mesh.traverse((child) => {
                 if (child.isMesh && child.material) {
                     const materials = Array.isArray(child.material) ? child.material : [child.material];
                     for (const mat of materials) {
@@ -87,9 +92,11 @@ class Boss extends Enemy {
                 }
             });
 
+            parent.add(this.mesh);
+
             // Setup animations
             if (glb.animations && glb.animations.length > 0) {
-                this.mixer = new THREE.AnimationMixer(model);
+                this.mixer = new THREE.AnimationMixer(this.mesh);
                 const animNames = modelDef.animations || {};
 
                 glb.animations.forEach(clip => {
@@ -147,21 +154,22 @@ class Boss extends Enemy {
 
         // State-based animations
         if (this.state === 'charge') {
-            if (animNames.charge) this.playAnim(animNames.charge);
+            // Use run animation for charging
+            if (animNames.run) this.playAnim(animNames.run);
         } else if (this.state === 'mosh') {
             if (animNames.mosh) this.playAnim(animNames.mosh);
         } else if (this.state === 'recover') {
-            // Use slide animation for recovery (end of charge)
-            if (animNames.slide) this.playAnim(animNames.slide);
+            // Use walk/idle for recovery
+            if (animNames.walk) this.playAnim(animNames.walk);
             else if (animNames.idle) this.playAnim(animNames.idle);
         } else if (this.state === 'chase') {
             // Check if attacking
             if (this.attackAction.status === 'windup' || this.attackAction.status === 'action') {
                 if (animNames.attack) this.playAnim(animNames.attack);
             } else {
-                // Running/chasing
-                if (animNames.run) this.playAnim(animNames.run);
-                else if (animNames.walk) this.playAnim(animNames.walk);
+                // Walking while chasing
+                if (animNames.walk) this.playAnim(animNames.walk);
+                else if (animNames.idle) this.playAnim(animNames.idle);
             }
         }
     }
