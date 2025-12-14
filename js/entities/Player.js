@@ -230,28 +230,24 @@ class Player {
             });
 
             if (targetBone) {
-                // Apply position offset
-                if (weaponDef.position) {
-                    weapon.position.set(
-                        weaponDef.position.x || 0,
-                        weaponDef.position.y || 0,
-                        weaponDef.position.z || 0
-                    );
-                }
-
-                // Apply rotation offset
-                if (weaponDef.rotation) {
-                    weapon.rotation.set(
-                        weaponDef.rotation.x || 0,
-                        weaponDef.rotation.y || 0,
-                        weaponDef.rotation.z || 0
-                    );
-                }
+                // Store offset transforms
+                this.weaponOffset = {
+                    position: new THREE.Vector3(
+                        weaponDef.position?.x || 0,
+                        weaponDef.position?.y || 0,
+                        weaponDef.position?.z || 0
+                    ),
+                    rotation: new THREE.Euler(
+                        weaponDef.rotation?.x || 0,
+                        weaponDef.rotation?.y || 0,
+                        weaponDef.rotation?.z || 0
+                    )
+                };
 
                 // Reduce shininess on weapon and ensure visibility
                 weapon.traverse((child) => {
                     if (child.isMesh) {
-                        child.frustumCulled = false; // Prevent culling when attached to bone
+                        child.frustumCulled = false;
                         child.castShadow = true;
                         child.visible = true;
 
@@ -266,10 +262,11 @@ class Player {
                     }
                 });
 
-                targetBone.add(weapon);
-                weapon.updateMatrixWorld(true);
+                // Add weapon to mesh container (not bone) - we'll update position manually
+                this.mesh.add(weapon);
                 this.weapon = weapon;
-                console.log(`[Player] Weapon attached to ${weaponDef.bone}`, targetBone);
+                this.weaponBone = targetBone;
+                console.log(`[Player] Weapon loaded, will follow ${weaponDef.bone}`);
             } else {
                 console.warn(`[Player] Attachment point '${weaponDef.bone}' not found. Available objects:`);
                 model.traverse((child) => {
@@ -652,6 +649,29 @@ class Player {
         if (this.dead) {
             if (this.mixer) this.mixer.update(deltaTime);
             return;
+        }
+
+        // Update weapon to follow bone
+        if (this.weapon && this.weaponBone) {
+            this.weaponBone.updateWorldMatrix(true, false);
+            const boneWorldPos = new THREE.Vector3();
+            const boneWorldQuat = new THREE.Quaternion();
+            this.weaponBone.getWorldPosition(boneWorldPos);
+            this.weaponBone.getWorldQuaternion(boneWorldQuat);
+
+            // Convert world position to local (relative to this.mesh)
+            this.mesh.worldToLocal(boneWorldPos);
+            this.weapon.position.copy(boneWorldPos);
+            if (this.weaponOffset) {
+                this.weapon.position.add(this.weaponOffset.position);
+            }
+
+            // Apply bone rotation + offset
+            this.weapon.quaternion.copy(boneWorldQuat);
+            if (this.weaponOffset) {
+                const offsetQuat = new THREE.Quaternion().setFromEuler(this.weaponOffset.rotation);
+                this.weapon.quaternion.multiply(offsetQuat);
+            }
         }
 
         this.health.update(deltaTime);
