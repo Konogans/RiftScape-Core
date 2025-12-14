@@ -23,6 +23,13 @@ CharacterRegistry.register('wanderer', {
             dash: 'Run_Fast',
             slam: 'Charged_Ground_Slam',
             death: 'Shot_and_Slow_Fall_Backward'
+        },
+        weapon: {
+            path: 'models/Magitech_Battleaxe.glb',
+            bone: 'mixamorigRightHand', // Common Mixamo bone name
+            scale: 1.0,
+            position: { x: 0, y: 0, z: 0 },
+            rotation: { x: 0, y: 0, z: 0 }
         }
     },
     // THE PEDALBOARD

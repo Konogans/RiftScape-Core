@@ -184,9 +184,73 @@ class Player {
                     this.playAnim(animNames.idle);
                 }
             }
+
+            // Load weapon if defined
+            if (modelDef.weapon) {
+                this.loadWeapon(model, modelDef.weapon);
+            }
         } catch (e) {
             console.warn('[Player] Model load failed:', e);
             // Keep cube fallback
+        }
+    }
+
+    async loadWeapon(model, weaponDef) {
+        try {
+            const loader = new THREE.GLTFLoader();
+            const glb = await new Promise((resolve, reject) => {
+                loader.load(weaponDef.path, resolve, undefined, reject);
+            });
+
+            const weapon = glb.scene;
+            weapon.scale.setScalar(weaponDef.scale || 1.0);
+
+            // Find the bone to attach to
+            let targetBone = null;
+            model.traverse((child) => {
+                if (child.isBone && child.name === weaponDef.bone) {
+                    targetBone = child;
+                }
+            });
+
+            if (targetBone) {
+                // Apply position offset
+                if (weaponDef.position) {
+                    weapon.position.set(
+                        weaponDef.position.x || 0,
+                        weaponDef.position.y || 0,
+                        weaponDef.position.z || 0
+                    );
+                }
+
+                // Apply rotation offset
+                if (weaponDef.rotation) {
+                    weapon.rotation.set(
+                        weaponDef.rotation.x || 0,
+                        weaponDef.rotation.y || 0,
+                        weaponDef.rotation.z || 0
+                    );
+                }
+
+                // Reduce shininess on weapon too
+                weapon.traverse((child) => {
+                    if (child.isMesh && child.material) {
+                        if (child.material.metalness !== undefined) child.material.metalness = 0.3;
+                        if (child.material.roughness !== undefined) child.material.roughness = 0.6;
+                    }
+                });
+
+                targetBone.add(weapon);
+                this.weapon = weapon;
+                console.log(`[Player] Weapon attached to ${weaponDef.bone}`);
+            } else {
+                console.warn(`[Player] Bone '${weaponDef.bone}' not found. Available bones:`);
+                model.traverse((child) => {
+                    if (child.isBone) console.log(`  - ${child.name}`);
+                });
+            }
+        } catch (e) {
+            console.warn('[Player] Weapon load failed:', e);
         }
     }
 
