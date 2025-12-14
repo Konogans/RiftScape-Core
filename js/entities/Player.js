@@ -208,10 +208,11 @@ class Player {
             const weapon = glb.scene;
             weapon.scale.setScalar(weaponDef.scale || 1.0);
 
-            // Find the bone to attach to
+            // Find the bone/object to attach to
             let targetBone = null;
             model.traverse((child) => {
-                if (child.isBone && child.name === weaponDef.bone) {
+                // Match by name - check bones first, then any object
+                if (child.name === weaponDef.bone) {
                     targetBone = child;
                 }
             });
@@ -251,9 +252,9 @@ class Player {
                 this.weapon = weapon;
                 console.log(`[Player] Weapon attached to ${weaponDef.bone}`);
             } else {
-                console.warn(`[Player] Bone '${weaponDef.bone}' not found. Available bones:`);
+                console.warn(`[Player] Attachment point '${weaponDef.bone}' not found. Available objects:`);
                 model.traverse((child) => {
-                    if (child.isBone) console.log(`  - ${child.name}`);
+                    if (child.name) console.log(`  - ${child.name} (${child.type})`);
                 });
             }
         } catch (e) {
