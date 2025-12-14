@@ -52,6 +52,9 @@ class Boss extends Enemy {
         // Update attack action state machine (required for damage to be dealt)
         this.attackAction.update(deltaTime * 1000);
 
+        // Decrement attack cooldown
+        this.attackCooldown -= deltaTime * 1000;
+
         // Flash timer logic
         if (this.flashTimer > 0) {
             this.flashTimer -= deltaTime;
@@ -115,9 +118,11 @@ class Boss extends Enemy {
         this.stateTimer = 2.0; // Charge duration
         this.mesh.material.emissive.setHex(0xffff00); // Warning Yellow
         this.game.sound.play('error'); // Telegraph Sound
-        
-        // Aim at player
-        this.mesh.lookAt(this.game.player.mesh.position.x, this.mesh.position.y, this.game.player.mesh.position.z);
+
+        // Aim at current target (gate, player, or structure)
+        const target = this.currentTarget || this.game.player;
+        const targetPos = target.mesh ? target.mesh.position : target.position;
+        this.mesh.lookAt(targetPos.x, this.mesh.position.y, targetPos.z);
     }
     
     performCharge(dt) {
