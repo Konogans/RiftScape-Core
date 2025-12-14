@@ -547,8 +547,13 @@ class Player {
     
 	update(deltaTime, elapsed) {
         if (this.game.dialogueSystem && this.game.dialogueSystem.isOpen) return;
-        if (this.dead) return;
-        
+
+        // Keep updating mixer for death animation even when dead
+        if (this.dead) {
+            if (this.mixer) this.mixer.update(deltaTime);
+            return;
+        }
+
         this.health.update(deltaTime);
         this.updateBuffs(deltaTime);
 
