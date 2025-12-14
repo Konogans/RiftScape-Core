@@ -14,21 +14,23 @@ The goal is to move beyond simple slot replacement and allow true build speciali
 | :--- | :--- | :--- |
 | **Mounted Combat** | A character (e.g., "The Cavalier") can summon a vehicle/creature, altering movement (`moveSpeed` override) and primary attack type (e.g., "Charge" instead of "Melee"). | `Vehicle/Mount Entity Class`, `Collision refactor (Mount is larger)`, `Custom Physics overrides`. |
 | **Monster Zoo / Ability Harvest** | Collect enemy "DNA" (Essence variant) to permanently unlock enemy abilities for rebind. | `LootSystem` overhaul (`DNA` drop chance), `AbilityRegistry` expansion, `MetaProgression` track for unlocked monster abilities. |
-| **Specialized Gathering** | Introduce *active* abilities dedicated to harvesting specific resource nodes (e.g., Wrench dismantles, Scribe extracts aether). | `WorldManager` refactor (Add Resource Nodes), `AbilityRegistry` update (New `'gathering'` ability type). |
+| **Specialized Gathering** | Introduce *active* abilities dedicated to harvesting specific resource nodes (e.g., Wrench dismantles, Scribe extracts aether). | `WorldManager` refactor (Add Resource Nodes), `AbilityRegistry` update (New `'gathering'` ability type), **NEW: `ResourceNode` Entity.** |
 | **Loadout Presets** | Allow players to save and name 3-5 complete ability loadouts per character, selectable at the Rift Gate. | `MetaProgression` update (`loadoutPresets: {}`), `DialogueSystem` refactor (Preset selection menu). |
 
 ---
 
-## II. 📦 Resources & Crafting Economy
+## II. 📦 Resources, Inventory, & Economy (MERGED/EXPANDED)
 
-Introduce secondary resource types to fuel hub improvements and unique consumables, moving beyond Essence alone.
+Introduce secondary resource types, an inventory, and an item equipment system to fuel hub improvements, crafting, and unique consumables.
 
-| Idea | Resource Type | Use Case / Feature |
+| Idea | Core Mechanic | Required Sub-Systems |
 | :--- | :--- | :--- |
-| **Aether Shards** | Rare, magic-affinity material. | **Runes/Enchantments:** Permanent structure buffs (e.g., Wall reflects damage). |
-| **Tech Scraps** | Common, tech-affinity material harvested from structures/robots. | **Consumables Crafting:** One-time use deployables (e.g., single-use turret, drone). |
-| **Crafting Bench** | Dedicated UI/NPC for combining materials. | **Smith/Scribe Upgrade Path:** The Blacksmith/Scribe NPC roles unlock unique crafting recipes based on Affinities. |
-| **Blueprint Discovery** | Blueprints are rare drops in the Rift that unlock new crafting recipes or unique structures. | `LootSystem` (Blueprint drop roll), `UpgradeRegistry` (Tracks unlocked blueprints). |
+| **Inventory & Slots** | Implement a persistence system for items. Abilities are linked to **equipped items** instead of character class directly. | **NEW: `ItemRegistry.js`**, **`MetaProgression.data.inventory`**, **`MetaProgression.data.equipped`** (`primaryWeapon`, `armor`, `utility`). |
+| **Aether Shards** | Rare, magic-affinity material. Used for Enchanting. | `LootSystem` update, **NEW: `ResourceNode` Entity**, `UpgradeRegistry` (Add material costs). |
+| **Tech Scraps** | Common, tech-affinity material harvested from structures/robots. Used for Consumables Crafting. | `LootSystem` update, **NEW: `ResourceNode` Entity**. |
+| **Crafting Bench** | Dedicated UI/NPC for combining materials into **Items** or **Consumables**. | **NEW: `RecipeRegistry.js`**, **NEW: `CraftingSystem.js`**, `DialogueSystem` refactor (Crafting menu). |
+| **Enchanting / Runes** | Apply `Aether Shards` and Essence to **Items** or **Structures** to gain permanent stat buffs (e.g., Wall reflects damage). | `UpgradeRegistry` (Material costs), `ItemRegistry` (Enchantment properties). |
+| **Blueprint Discovery** | Blueprints are rare drops in the Rift that unlock new crafting recipes or unique structures. | `LootSystem` (Blueprint drop roll), `RecipeRegistry` (Tracks unlocked recipes). |
 
 ---
 
@@ -52,8 +54,6 @@ Adding mid-run progression and dynamic map elements.
 
 ---
 
-# `IDEAS.md` - New Section
-
 ## V. 🌌 Aetherspace & Meta-World Expansion (The Runescape Cannon Inspired Overhaul)
 
 The goal is to shift the game's structure from a simple Hub $\leftrightarrow$ Rift loop to a persistent, navigable Meta-Map that scales danger and reward based on distance traveled (Aetherspace Depth).
@@ -65,5 +65,3 @@ The goal is to shift the game's structure from a simple Hub $\leftrightarrow$ Ri
 | **Runescape Cannon Portals** | Portals to specific **Aether Realms** (your current Biomes) are accessed from the Ship. Further Realms on the map have higher Level/Savageness factors. | **New Metric: Aether Depth.** Portal distance on the map directly feeds into `WorldNode.level` calculation. |
 | **Realm Defense/Claim** | Successfully clearing a dangerous Realm allows the player to briefly claim the area, building a temporary forwarding base or planting a resource-generating structure before the Realm collapses. | `HubState` refactor (Temporary outpost save slots), `RaidManager` extension (Claim/Defense timer). |
 | **Aether Resources** | New resource type (`Aether Fuel` or `Rift Essence`) required to travel the Aetherspace, consumed based on distance/Realm depth. | **New Resource Type** (Fuel), `ShipUpgrades` (Fuel Efficiency upgrades), `DialogueSystem` (Fuel purchase option). |
-
----
