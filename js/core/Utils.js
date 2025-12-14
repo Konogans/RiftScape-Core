@@ -324,6 +324,64 @@ const MetaProgression = {
         }
         
         return stats;
+    },
+    
+    // Inventory management
+    addToInventory(itemType, itemId, count = 1) {
+        if (!this.data.inventory) this.data.inventory = [];
+        
+        const existing = this.data.inventory.find(item => item.type === itemType && item.id === itemId);
+        if (existing) {
+            existing.count += count;
+        } else {
+            this.data.inventory.push({ type: itemType, id: itemId, count });
+        }
+        this.save();
+    },
+    
+    removeFromInventory(itemType, itemId, count = 1) {
+        if (!this.data.inventory) return false;
+        
+        const item = this.data.inventory.find(i => i.type === itemType && i.id === itemId);
+        if (!item || item.count < count) return false;
+        
+        item.count -= count;
+        if (item.count <= 0) {
+            const index = this.data.inventory.indexOf(item);
+            this.data.inventory.splice(index, 1);
+        }
+        this.save();
+        return true;
+    },
+    
+    getInventoryCount(itemType, itemId) {
+        if (!this.data.inventory) return 0;
+        const item = this.data.inventory.find(i => i.type === itemType && i.id === itemId);
+        return item ? item.count : 0;
+    },
+    
+    getInventoryItems() {
+        return this.data.inventory || [];
+    },
+    
+    // Selling items for essence
+    sellItem(itemType, itemId, count = 1) {
+        if (!this.removeFromInventory(itemType, itemId, count)) return false;
+        
+        // Calculate sell value (equipment has base value)
+        let value = 0;
+        if (itemType === 'equipment') {
+            const equipment = EquipmentRegistry.get(itemId);
+            if (equipment) {
+                // Base value: 50 essence for weapons, 25 for trinkets
+                value = equipment.type === 'weapon' ? 50 : 25;
+                value *= count;
+            }
+        }
+        
+        this.data.essence += value;
+        this.save();
+        return value;
     }
 };
 
