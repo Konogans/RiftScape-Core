@@ -16,11 +16,11 @@ CharacterRegistry.register('wanderer', {
         path: 'models/Wanderer.glb',
         scale: 1.0,
         animations: {
-            idle: 'Idle',
+            idle: 'Idle_10',
             walk: 'Walking',
             run: 'Running',
             attack: 'Attack',
-            dash: 'RunFast',
+            dash: 'Run_Fast',
             slam: 'Charged_Ground_Slam',
             death: 'Shot_and_Slow_Fall_Backward'
         }

@@ -33,7 +33,7 @@ EntityRegistry.register('default', {
     health: { active: 3, reserve: 5 },
 
     // MODEL (loaded by Enemy.loadModel)
-    model: 'models/Riftling_Clean.glb',
+    model: 'models/Riftling.glb',
 
     // BEHAVIOR (interpreted by BehaviorSystem)
     behavior: 'chase',
@@ -95,6 +95,8 @@ EntityRegistry.register('swift', {
     scale: 0.7,
     speed: { min: 3, max: 4 },
     health: { active: 1, reserve: 2 },
+	
+    model: 'models/Swift.glb',
     
     behavior: 'swift',
     

@@ -10,7 +10,10 @@ const BiomeRegistry = {
     list() { return Object.keys(this.biomes); }
 };
 BiomeRegistry.register('rift_wastes', {
-    name: 'The Rift Wastes', groundColor: 0x1a1a2e, fogColor: 0x0a0a15, fogDensity: 0.03, ambientColor: 0x404060,
+    name: 'The Rift Wastes', groundColor: 0x1a1a2e,
+    groundTexture: 'images/tex_scorched_aether_ash.jpg', // Seamless ground texture
+    groundTextureRepeat: 1, // Repeat per chunk
+	fogColor: 0x0a0a15, fogDensity: 0.03, ambientColor: 0x404060,
     enemyWeights: { default: 0.6, swift: 0.25, brute: 0.1, spitter: 0.05 }, spawnRateMultiplier: 1, portalThreshold: { kills: 15, time: 45 }
 });
 BiomeRegistry.register('crimson_hollow', {
@@ -29,7 +32,7 @@ BiomeRegistry.register('sanctuary', {
     name: 'The Outpost',
     groundColor: 0x224422, // Fallback color
     groundTexture: 'images/tex_garrisoned_earth.jpg', // Seamless ground texture
-    groundTextureRepeat: 4, // Repeat per chunk
+    groundTextureRepeat: 1, // Repeat per chunk
     fogColor: 0x88ccff,    // Blue sky
     fogDensity: 0.005,     // Very clear view
     ambientColor: 0x8888aa, // Bright ambient light

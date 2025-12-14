@@ -19,8 +19,8 @@ from pathlib import Path
 # EDIT THESE PATHS
 # =============================================================================
 
-INPUT_FILE = r"C:\Users\KonoPea_See-Evo-GX2\Documents\RiftScape\Survival_Core\RiftScape-core\models\Meshy_Merged_Animations.glb"
-OUTPUT_FILE = r"C:\Users\KonoPea_See-Evo-GX2\Documents\RiftScape\Survival_Core\RiftScape-core\models\Riftling_Clean.glb"
+INPUT_FILE = r"C:\Users\KonoPea_See-Evo-GX2\Documents\RiftScape\RiftScape-core\models\raw\Meshy_Merged_Animations.glb"
+OUTPUT_FILE = r"C:\Users\KonoPea_See-Evo-GX2\Documents\RiftScape\RiftScape-core\models\Riftling_Clean.glb"
 
 # =============================================================================
 # CLEANER
