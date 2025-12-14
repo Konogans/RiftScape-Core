@@ -58,3 +58,4 @@ All game content (Stats, Visuals, Rules) must be separated from logic.
 Whenever you prompt an AI, add this "System Header":
 
 > "I am working on the RiftScape project. It is a raw JS game using Three.js r147 with no build step. Use global variables for managers (window.Game, window.WorldState). Use the Registry pattern for content. Keep code terse and functional. Refer to the Style Guide if unsure."
+

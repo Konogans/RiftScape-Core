@@ -104,7 +104,7 @@ Contributions are welcome! This project follows the **"Punk Rock Coding"** philo
 
 ### For AI Contributors
 
-See `AI_CONTRIBUTOR.md` for detailed style guidelines and architecture patterns.
+See `CONTRIBUTING.md` for detailed style guidelines and architecture patterns.
 
 ### How to Contribute
 
