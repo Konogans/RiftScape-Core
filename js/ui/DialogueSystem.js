@@ -51,6 +51,11 @@ class DialogueSystem {
             return;
         }
         
+        if (npcDef.uiType === 'void') {
+            this.updateVoid(npc, npcDef);
+            return;
+        }
+        
         if (npcDef.uiType === 'reset') {
 			
 			// 1. REVERT TO WANDERER (If not currently Wanderer)
@@ -836,6 +841,719 @@ class DialogueSystem {
                 this.optionsEl.appendChild(itemDiv);
             });
         }
+        
+        // Close button
+        const closeBtn = document.createElement('button');
+        closeBtn.className = 'dialogue-btn close-btn';
+        closeBtn.textContent = 'Close';
+        closeBtn.onclick = () => this.close();
+        this.optionsEl.appendChild(closeBtn);
+    }
+    
+    updateVoid(npc, npcDef) {
+        this.optionsEl.innerHTML = '';
+        this.essenceEl.textContent = `◆ ${MetaProgression.data.essence}`;
+        
+        // Get VoidBridge reference (should be on window after script loads)
+        if (!window.VoidBridge) {
+            console.error('[DialogueSystem] VoidBridge not available. Ensure VoidBridge.js is loaded.');
+            return;
+        }
+        const VoidBridge = window.VoidBridge;
+        
+        // Load Void memory
+        const voidMemory = VoidMemoryStore.load();
+        
+        // Configuration section
+        const configSection = document.createElement('div');
+        configSection.className = 'pedalboard-section';
+        configSection.innerHTML = `<div class="section-title">Configuration</div>`;
+        
+        // Mode selector
+        const modeDiv = document.createElement('div');
+        modeDiv.style.marginBottom = '10px';
+        const currentMode = (window.VoidBridge || VoidBridge)?.config?.mode || 'oracle';
+        modeDiv.innerHTML = `
+            <label style="color:#aaa; font-size:12px; display:block; margin-bottom:5px;">Mode:</label>
+            <select id="void-mode" style="width:100%; padding:5px; background:#223344; border:1px solid #557799; color:#fff; font-family:'Courier New', monospace;">
+                <option value="oracle" ${currentMode === 'oracle' ? 'selected' : ''}>Oracle (Constrained)</option>
+                <option value="unbound" ${currentMode === 'unbound' ? 'selected' : ''}>Unbound (Experimental - Can Break Saves)</option>
+            </select>
+        `;
+        const modeSelect = modeDiv.querySelector('#void-mode');
+        const bridge = window.VoidBridge || VoidBridge;
+        modeSelect.onchange = () => {
+            bridge.config.mode = modeSelect.value;
+            bridge.saveConfig();
+        };
+        configSection.appendChild(modeDiv);
+        
+        // API Endpoint
+        const endpointDiv = document.createElement('div');
+        endpointDiv.style.marginBottom = '10px';
+        const currentEndpoint = VoidBridge.config.endpoint || '';
+        endpointDiv.innerHTML = `
+            <label style="color:#aaa; font-size:12px; display:block; margin-bottom:5px;">API Endpoint:</label>
+            <input type="text" id="void-endpoint" placeholder="https://your-proxy/v1/void" 
+                   value="${currentEndpoint}" 
+                   style="width:100%; padding:5px; background:#223344; border:1px solid #557799; color:#fff; font-family:'Courier New', monospace; font-size:11px;">
+        `;
+        const endpointInput = endpointDiv.querySelector('#void-endpoint');
+        endpointInput.onchange = () => {
+            VoidBridge.config.endpoint = endpointInput.value;
+            VoidBridge.saveConfig();
+        };
+        configSection.appendChild(endpointDiv);
+        
+        // API Key
+        const keyDiv = document.createElement('div');
+        keyDiv.style.marginBottom = '10px';
+        const currentApiKey = VoidBridge.config.apiKey || '';
+        keyDiv.innerHTML = `
+            <label style="color:#aaa; font-size:12px; display:block; margin-bottom:5px;">API Key (stored locally):</label>
+            <input type="password" id="void-apikey" placeholder="sk-..." 
+                   value="${currentApiKey}" 
+                   style="width:100%; padding:5px; background:#223344; border:1px solid #557799; color:#fff; font-family:'Courier New', monospace; font-size:11px;">
+        `;
+        const keyInput = keyDiv.querySelector('#void-apikey');
+        keyInput.onchange = () => {
+            VoidBridge.config.apiKey = keyInput.value;
+            VoidBridge.saveConfig();
+        };
+        configSection.appendChild(keyDiv);
+        
+        // Reset Memory button
+        const resetDiv = document.createElement('div');
+        resetDiv.style.marginTop = '10px';
+        resetDiv.style.paddingTop = '10px';
+        resetDiv.style.borderTop = '1px solid #334455';
+        const resetBtn = document.createElement('button');
+        resetBtn.className = 'dialogue-btn';
+        resetBtn.style.width = '100%';
+        resetBtn.style.background = '#442222';
+        resetBtn.style.borderColor = '#884444';
+        resetBtn.textContent = 'Reset Void Memory';
+        resetBtn.onclick = () => {
+            if (confirm('This will clear all conversation history and reset The Void\'s memory. The Void will forget everything. Continue?')) {
+                VoidMemoryStore.reset();
+                
+                // Reload the Void dialogue to show cleared state
+                this.updateVoid(npc, npcDef);
+            }
+        };
+        resetDiv.appendChild(resetBtn);
+        configSection.appendChild(resetDiv);
+        
+        this.optionsEl.appendChild(configSection);
+        
+        // Conversation history
+        const chatSection = document.createElement('div');
+        chatSection.className = 'pedalboard-section';
+        chatSection.style.maxHeight = '300px';
+        chatSection.style.overflowY = 'auto';
+        chatSection.innerHTML = `<div class="section-title">Conversation</div>`;
+        
+        const chatLog = document.createElement('div');
+        chatLog.id = 'void-chat-log';
+        chatLog.style.minHeight = '150px';
+        chatLog.style.maxHeight = '250px';
+        chatLog.style.overflowY = 'auto';
+        chatLog.style.padding = '10px';
+        chatLog.style.background = 'rgba(0,0,0,0.3)';
+        chatLog.style.border = '1px solid #334455';
+        chatLog.style.borderRadius = '4px';
+        chatLog.style.fontSize = '12px';
+        chatLog.style.color = '#aaa';
+        chatLog.style.lineHeight = '1.5';
+        
+        // Restore conversation history or show greeting
+        if (voidMemory.conversationHistory && voidMemory.conversationHistory.length > 0) {
+            // Restore saved conversation
+            voidMemory.conversationHistory.forEach(msg => {
+                const msgDiv = document.createElement('div');
+                msgDiv.style.marginBottom = '10px';
+                if (msg.role === 'player') {
+                    msgDiv.style.color = '#88ccff';
+                    msgDiv.innerHTML = `<strong>You:</strong> ${msg.content}`;
+                } else {
+                    msgDiv.style.color = '#aa88ff';
+                    msgDiv.style.whiteSpace = 'pre-wrap';
+                    msgDiv.innerHTML = `<strong>The Void:</strong> ${msg.content}`;
+                }
+                chatLog.appendChild(msgDiv);
+            });
+            chatLog.scrollTop = chatLog.scrollHeight;
+        } else if (voidMemory.conversationCount === 0) {
+            // First contact - show greeting
+            const greetingMsg = `<div style="color:#aa88ff; margin-bottom:10px;"><strong>The Void:</strong> ${npcDef.greeting}</div>`;
+            chatLog.innerHTML = greetingMsg;
+            // Save greeting to history
+            VoidMemoryStore.addMessage('void', npcDef.greeting);
+        }
+        
+        chatSection.appendChild(chatLog);
+        this.optionsEl.appendChild(chatSection);
+        
+        // Input section
+        const inputSection = document.createElement('div');
+        inputSection.className = 'pedalboard-section';
+        inputSection.style.borderTop = 'none';
+        inputSection.style.paddingTop = '0';
+        
+        const inputDiv = document.createElement('div');
+        inputDiv.style.marginBottom = '10px';
+        inputDiv.innerHTML = `
+            <textarea id="void-input" placeholder="Speak to The Void..." 
+                      style="width:100%; min-height:60px; padding:8px; background:#223344; border:1px solid #557799; color:#fff; font-family:'Courier New', monospace; font-size:12px; resize:vertical;"></textarea>
+        `;
+        const inputField = inputDiv.querySelector('#void-input');
+        inputSection.appendChild(inputDiv);
+        
+        // Action buttons
+        const actionsDiv = document.createElement('div');
+        actionsDiv.className = 'ability-select';
+        actionsDiv.style.marginTop = '10px';
+        
+        const sendBtn = document.createElement('button');
+        sendBtn.className = 'ability-btn';
+        sendBtn.textContent = 'Ask The Void';
+        sendBtn.style.flex = '1';
+        
+        // Rate limit status display
+        const rateLimitStatus = document.createElement('div');
+        rateLimitStatus.id = 'void-rate-limit-status';
+        rateLimitStatus.style.display = 'none';
+        rateLimitStatus.style.color = '#ffaa66';
+        rateLimitStatus.style.fontSize = '12px';
+        rateLimitStatus.style.marginTop = '5px';
+        rateLimitStatus.style.textAlign = 'center';
+        rateLimitStatus.style.fontStyle = 'italic';
+        
+        // Update rate limit UI
+        const updateRateLimitUI = () => {
+            if (VoidBridge.isRateLimited()) {
+                const remaining = VoidBridge.getRateLimitRemaining();
+                rateLimitStatus.textContent = `Rate limited. Please wait ${remaining} seconds...`;
+                rateLimitStatus.style.display = 'block';
+                sendBtn.disabled = true;
+                sendBtn.style.opacity = '0.5';
+                sendBtn.style.cursor = 'not-allowed';
+            } else {
+                rateLimitStatus.style.display = 'none';
+                sendBtn.disabled = false;
+                sendBtn.style.opacity = '1';
+                sendBtn.style.cursor = 'pointer';
+            }
+        };
+        
+        // Check rate limit on load and update periodically
+        updateRateLimitUI();
+        const rateLimitCheckInterval = setInterval(updateRateLimitUI, 1000);
+        
+        // Clean up interval when dialogue closes
+        const originalClose = this.close.bind(this);
+        this.close = () => {
+            clearInterval(rateLimitCheckInterval);
+            originalClose();
+        };
+        
+        // Store reference to chat log and input for async updates
+        // Helper function to show/hide thinking indicator
+        const showThinking = () => {
+            const thinkingDiv = document.createElement('div');
+            thinkingDiv.id = 'void-thinking';
+            thinkingDiv.style.color = '#aa88ff';
+            thinkingDiv.style.marginBottom = '10px';
+            thinkingDiv.style.fontStyle = 'italic';
+            thinkingDiv.style.opacity = '0.7';
+            thinkingDiv.innerHTML = '<strong>The Void:</strong> <span class="thinking-dots">...</span>';
+            chatLog.appendChild(thinkingDiv);
+            chatLog.scrollTop = chatLog.scrollHeight;
+            
+            // Animate dots
+            const dots = thinkingDiv.querySelector('.thinking-dots');
+            let dotCount = 0;
+            const dotInterval = setInterval(() => {
+                dotCount = (dotCount + 1) % 4;
+                dots.textContent = '.'.repeat(dotCount);
+            }, 500);
+            
+            return () => {
+                clearInterval(dotInterval);
+                if (thinkingDiv.parentNode) {
+                    thinkingDiv.parentNode.removeChild(thinkingDiv);
+                }
+            };
+        };
+        
+        // Helper function to handle code execution with chained retries
+        // maxErrorRetries: limit for error retries (to prevent infinite error loops)
+        // maxProbeChain: limit for successful probe chains (much higher, allows exploration)
+        const handleCodeExecution = async (code, retryCount = 0, errorRetryCount = 0, maxErrorRetries = 3, maxProbeChain = 50) => {
+            // Check probe chain limit (for successful executions)
+            if (retryCount >= maxProbeChain) {
+                const maxChainMsg = document.createElement('div');
+                maxChainMsg.style.color = '#ffaa66';
+                maxChainMsg.style.marginBottom = '10px';
+                maxChainMsg.style.fontStyle = 'italic';
+                maxChainMsg.textContent = `[Probe chain limit reached (${maxProbeChain}). The Void's exploration is complete.]`;
+                chatLog.appendChild(maxChainMsg);
+                chatLog.scrollTop = chatLog.scrollHeight;
+                return;
+            }
+            
+            // Show code in chat (only on first execution)
+            if (retryCount === 0) {
+                const codeMsg = document.createElement('div');
+                codeMsg.style.marginBottom = '10px';
+                codeMsg.innerHTML = `
+                    <div style="color:#ffaa88; margin-bottom:5px;"><strong>Code to execute${retryCount > 0 ? ` (retry ${retryCount})` : ''}:</strong></div>
+                    <pre style="background:#112233; padding:8px; border:1px solid #334455; border-radius:4px; overflow-x:auto; font-size:10px; color:#88ff88;">${code}</pre>
+                `;
+                chatLog.appendChild(codeMsg);
+            } else {
+                const retryCodeMsg = document.createElement('div');
+                retryCodeMsg.style.marginBottom = '10px';
+                retryCodeMsg.innerHTML = `
+                    <div style="color:#ffaa88; margin-bottom:5px;"><strong>Retry code (attempt ${retryCount + 1}):</strong></div>
+                    <pre style="background:#112233; padding:8px; border:1px solid #334455; border-radius:4px; overflow-x:auto; font-size:10px; color:#88ff88;">${code}</pre>
+                `;
+                chatLog.appendChild(retryCodeMsg);
+            }
+            
+            // Execute code
+            const execResult = VoidSystem.executeCode(code);
+            
+            // Show console logs if any
+            if (execResult.logs && execResult.logs.length > 0) {
+                const logsDiv = document.createElement('div');
+                logsDiv.style.marginBottom = '10px';
+                logsDiv.style.padding = '8px';
+                logsDiv.style.background = '#112233';
+                logsDiv.style.border = '1px solid #334455';
+                logsDiv.style.borderRadius = '4px';
+                logsDiv.style.fontSize = '10px';
+                logsDiv.style.fontFamily = 'monospace';
+                
+                const logsTitle = document.createElement('div');
+                logsTitle.style.color = '#88aaff';
+                logsTitle.style.marginBottom = '5px';
+                logsTitle.textContent = retryCount === 0 ? 'Console output:' : `Retry ${retryCount} console output:`;
+                logsDiv.appendChild(logsTitle);
+                
+                execResult.logs.forEach(log => {
+                    const logLine = document.createElement('div');
+                    logLine.style.color = log.type === 'error' ? '#ff6666' : 
+                                         log.type === 'warn' ? '#ffaa66' : '#88ff88';
+                    logLine.style.marginBottom = '2px';
+                    logLine.textContent = `[${log.type}] ${log.args.join(' ')}`;
+                    logsDiv.appendChild(logLine);
+                });
+                
+                chatLog.appendChild(logsDiv);
+                chatLog.scrollTop = chatLog.scrollHeight;
+            }
+            
+            // Show execution result
+            const execMsg = document.createElement('div');
+            execMsg.style.marginBottom = '10px';
+            execMsg.style.fontStyle = 'italic';
+            if (execResult.ok) {
+                execMsg.style.color = '#88ff88';
+                execMsg.textContent = retryCount === 0 ? '[Code executed]' : `[Retry ${retryCount} code executed]`;
+            } else {
+                execMsg.style.color = '#ff6666';
+                execMsg.textContent = retryCount === 0 ? `[Code error] ${execResult.error}` : `[Retry ${retryCount} code error] ${execResult.error}`;
+            }
+            chatLog.appendChild(execMsg);
+            chatLog.scrollTop = chatLog.scrollHeight;
+            
+            // Always send feedback back to Void to allow chaining (whether success or error)
+            // This allows the Void to probe, see results, and send more code
+            const hideThinking = showThinking();
+            
+            // Track error retries separately from successful probe chains
+            const newErrorRetryCount = !execResult.ok ? errorRetryCount + 1 : 0;
+            
+            // Check error retry limit (only for consecutive errors)
+            if (!execResult.ok && newErrorRetryCount >= maxErrorRetries) {
+                hideThinking();
+                const maxErrorMsg = document.createElement('div');
+                maxErrorMsg.style.color = '#ff6666';
+                maxErrorMsg.style.marginBottom = '10px';
+                maxErrorMsg.style.fontStyle = 'italic';
+                maxErrorMsg.textContent = `[Max error retries reached (${maxErrorRetries}). The Void cannot fix this code.]`;
+                chatLog.appendChild(maxErrorMsg);
+                chatLog.scrollTop = chatLog.scrollHeight;
+                return;
+            }
+            
+            const feedbackPayload = {
+                gameState: VoidBridge.buildGameState(this.game),
+                voidMemory: VoidMemoryStore.load(),
+                mode: VoidBridge.config.mode,
+                playerMessage: !execResult.ok
+                    ? `The previous code you returned threw an error (error retry ${newErrorRetryCount}/${maxErrorRetries}). Please fix it and return a new JSON object.`
+                    : `The previous code executed successfully (probe ${retryCount + 1}). Here are the console logs. You may send more code to continue probing or exploring, or omit the "code" field to end the chain.`,
+                lastError: execResult.error || null,
+                lastCode: code,
+                lastLogs: execResult.logs || null
+            };
+            
+            const feedbackResponse = await VoidBridge.sendRequest(feedbackPayload);
+            hideThinking();
+            
+            // Extract JSON from response field if needed (do this BEFORE checking for code)
+            if (feedbackResponse && feedbackResponse.response && typeof feedbackResponse.response === 'string') {
+                const trimmed = feedbackResponse.response.trim();
+                if (trimmed.startsWith('{') || trimmed.startsWith('[')) {
+                    try {
+                        const parsedResponse = JSON.parse(trimmed);
+                        if (parsedResponse.response || parsedResponse.code || parsedResponse.action) {
+                            if (parsedResponse.response && typeof parsedResponse.response === 'string') {
+                                feedbackResponse.response = parsedResponse.response;
+                            }
+                            if (parsedResponse.code && !feedbackResponse.code) feedbackResponse.code = parsedResponse.code;
+                            if (parsedResponse.action && !feedbackResponse.action) feedbackResponse.action = parsedResponse.action;
+                            if (parsedResponse.narration && !feedbackResponse.narration) feedbackResponse.narration = parsedResponse.narration;
+                            if (parsedResponse.memoryUpdates && !feedbackResponse.memoryUpdates) feedbackResponse.memoryUpdates = parsedResponse.memoryUpdates;
+                        }
+                    } catch (e) {
+                        try {
+                            const unescaped = trimmed.replace(/\\n/g, '\n').replace(/\\"/g, '"').replace(/\\\\/g, '\\').replace(/\\t/g, '\t');
+                            const parsedResponse = JSON.parse(unescaped);
+                            if (parsedResponse.response || parsedResponse.code || parsedResponse.action) {
+                                if (parsedResponse.response && typeof parsedResponse.response === 'string') {
+                                    feedbackResponse.response = parsedResponse.response;
+                                }
+                                if (parsedResponse.code && !feedbackResponse.code) feedbackResponse.code = parsedResponse.code;
+                                if (parsedResponse.action && !feedbackResponse.action) feedbackResponse.action = parsedResponse.action;
+                                if (parsedResponse.narration && !feedbackResponse.narration) feedbackResponse.narration = parsedResponse.narration;
+                                if (parsedResponse.memoryUpdates && !feedbackResponse.memoryUpdates) feedbackResponse.memoryUpdates = parsedResponse.memoryUpdates;
+                            }
+                        } catch (e2) {
+                            // Not JSON, use as-is
+                        }
+                    }
+                }
+            }
+            
+            if (feedbackResponse && feedbackResponse.response) {
+                const feedbackMsg = document.createElement('div');
+                feedbackMsg.style.color = '#aa88ff';
+                feedbackMsg.style.marginBottom = '10px';
+                feedbackMsg.style.whiteSpace = 'pre-wrap';
+                const attemptLabel = retryCount === 0 ? '' : ` (probe ${retryCount + 1})`;
+                feedbackMsg.innerHTML = `<strong>The Void${attemptLabel}:</strong> ${feedbackResponse.response}`;
+                chatLog.appendChild(feedbackMsg);
+                chatLog.scrollTop = chatLog.scrollHeight;
+                
+                // Save to conversation history
+                VoidMemoryStore.addMessage('void', feedbackResponse.response);
+            }
+            
+            // If Void provides more code, continue the chain
+            if (feedbackResponse && feedbackResponse.code) {
+                // Recursively continue with new code
+                // Reset error retry count on success, increment on error
+                await handleCodeExecution(
+                    feedbackResponse.code, 
+                    retryCount + 1, 
+                    newErrorRetryCount,
+                    maxErrorRetries,
+                    maxProbeChain
+                );
+            } else {
+                // Void didn't provide code - chain ends (either success or Void decided to stop)
+                if (execResult.ok) {
+                    const chainEndMsg = document.createElement('div');
+                    chainEndMsg.style.color = '#88ff88';
+                    chainEndMsg.style.marginBottom = '10px';
+                    chainEndMsg.style.fontStyle = 'italic';
+                    chainEndMsg.textContent = '[Code execution chain completed. The Void has finished its exploration.]';
+                    chatLog.appendChild(chainEndMsg);
+                    chatLog.scrollTop = chatLog.scrollHeight;
+                } else {
+                    const chainEndMsg = document.createElement('div');
+                    chainEndMsg.style.color = '#ffaa66';
+                    chainEndMsg.style.marginBottom = '10px';
+                    chainEndMsg.style.fontStyle = 'italic';
+                    chainEndMsg.textContent = '[The Void did not provide a code fix. Chain ended.]';
+                    chatLog.appendChild(chainEndMsg);
+                    chatLog.scrollTop = chatLog.scrollHeight;
+                }
+            }
+        };
+        
+        const self = this;
+        sendBtn.onclick = async () => {
+            // Check rate limit before sending
+            if (VoidBridge.isRateLimited()) {
+                const remaining = VoidBridge.getRateLimitRemaining();
+                const rateLimitMsg = document.createElement('div');
+                rateLimitMsg.style.color = '#ffaa66';
+                rateLimitMsg.style.marginBottom = '10px';
+                rateLimitMsg.style.fontStyle = 'italic';
+                rateLimitMsg.textContent = `Rate limited. Please wait ${remaining} seconds before trying again.`;
+                chatLog.appendChild(rateLimitMsg);
+                chatLog.scrollTop = chatLog.scrollHeight;
+                return;
+            }
+            
+            const message = inputField.value.trim();
+            if (!message) return;
+            
+            // Add player message to chat
+            const playerMsg = document.createElement('div');
+            playerMsg.style.color = '#88ccff';
+            playerMsg.style.marginBottom = '10px';
+            playerMsg.innerHTML = `<strong>You:</strong> ${message}`;
+            chatLog.appendChild(playerMsg);
+            chatLog.scrollTop = chatLog.scrollHeight;
+            
+            // Save to conversation history
+            VoidMemoryStore.addMessage('player', message);
+            
+            // Clear input
+            inputField.value = '';
+            sendBtn.disabled = true;
+            sendBtn.textContent = 'Asking...';
+            
+            // Show thinking indicator
+            const hideThinking = showThinking();
+            
+            // Build payload
+            const gameState = VoidBridge.buildGameState(this.game);
+            const payload = {
+                gameState,
+                voidMemory,
+                mode: VoidBridge.config.mode,
+                playerMessage: message
+            };
+            
+            // Send request
+            const response = await VoidBridge.sendRequest(payload);
+            
+            // Hide thinking indicator
+            hideThinking();
+            
+            // Update rate limit UI after response
+            updateRateLimitUI();
+            
+            sendBtn.disabled = false;
+            sendBtn.textContent = 'Ask The Void';
+            
+            // Check for rate limit in response
+            if (response && response._rateLimit) {
+                const rateLimitMsg = document.createElement('div');
+                rateLimitMsg.style.color = '#ffaa66';
+                rateLimitMsg.style.marginBottom = '10px';
+                rateLimitMsg.style.fontStyle = 'italic';
+                rateLimitMsg.textContent = response.response || `Rate limited. Please wait ${response._retryAfter || 60} seconds.`;
+                chatLog.appendChild(rateLimitMsg);
+                chatLog.scrollTop = chatLog.scrollHeight;
+                VoidMemoryStore.addMessage('void', response.response || 'Rate limited.');
+                return;
+            }
+            
+            if (!response) {
+                const errorMsg = document.createElement('div');
+                errorMsg.style.color = '#ff6666';
+                errorMsg.style.marginBottom = '10px';
+                errorMsg.innerHTML = `<strong>The Void:</strong> The connection falters. Configure your API endpoint and key.`;
+                chatLog.appendChild(errorMsg);
+                chatLog.scrollTop = chatLog.scrollHeight;
+                return;
+            }
+            
+            // Check for JSON parse errors and send feedback to Void
+            if (response._parseError) {
+                const parseErrorMsg = document.createElement('div');
+                parseErrorMsg.style.color = '#ff6666';
+                parseErrorMsg.style.marginBottom = '10px';
+                parseErrorMsg.style.fontStyle = 'italic';
+                parseErrorMsg.textContent = `[JSON Parse Error] ${response._parseErrorMessage}`;
+                chatLog.appendChild(parseErrorMsg);
+                
+                // Show raw content that failed to parse
+                if (response._rawContent) {
+                    const rawContentDiv = document.createElement('div');
+                    rawContentDiv.style.marginBottom = '10px';
+                    rawContentDiv.style.padding = '8px';
+                    rawContentDiv.style.background = '#112233';
+                    rawContentDiv.style.border = '1px solid #ff6666';
+                    rawContentDiv.style.borderRadius = '4px';
+                    rawContentDiv.style.fontSize = '10px';
+                    rawContentDiv.style.fontFamily = 'monospace';
+                    rawContentDiv.style.color = '#ffaaaa';
+                    rawContentDiv.style.maxHeight = '200px';
+                    rawContentDiv.style.overflow = 'auto';
+                    rawContentDiv.textContent = response._rawContent.substring(0, 1000);
+                    chatLog.appendChild(rawContentDiv);
+                }
+                
+                chatLog.scrollTop = chatLog.scrollHeight;
+                
+                // Send parse error back to Void for correction
+                const hideThinking2 = showThinking();
+                
+                const parseErrorPayload = {
+                    gameState: VoidBridge.buildGameState(this.game),
+                    voidMemory: VoidMemoryStore.load(),
+                    mode: VoidBridge.config.mode,
+                    playerMessage: `Your previous response was not valid JSON. The parser error was: "${response._parseErrorMessage}". Please return ONLY a valid JSON object with no extra text, markdown, or prose.`,
+                    lastError: `JSON Parse Error: ${response._parseErrorMessage}`,
+                    lastCode: null,
+                    lastRawContent: response._rawContent
+                };
+                
+                const parseErrorResponse = await VoidBridge.sendRequest(parseErrorPayload);
+                hideThinking2();
+                
+                if (parseErrorResponse && !parseErrorResponse._parseError && parseErrorResponse.response) {
+                    const retryMsg = document.createElement('div');
+                    retryMsg.style.color = '#aa88ff';
+                    retryMsg.style.marginBottom = '10px';
+                    retryMsg.style.whiteSpace = 'pre-wrap';
+                    retryMsg.innerHTML = `<strong>The Void (corrected):</strong> ${parseErrorResponse.response}`;
+                    chatLog.appendChild(retryMsg);
+                    chatLog.scrollTop = chatLog.scrollHeight;
+                    
+                    // Save to conversation history
+                    VoidMemoryStore.addMessage('void', parseErrorResponse.response);
+                    
+                    // Process the corrected response normally
+                    response = parseErrorResponse;
+                } else {
+                    // Even the retry failed, just show error and stop
+                    return;
+                }
+            }
+            
+            // Extract JSON from response field if needed (do this BEFORE checking for code/action)
+            if (response.response && typeof response.response === 'string') {
+                const trimmed = response.response.trim();
+                // Check if it looks like JSON (starts with { or [)
+                if (trimmed.startsWith('{') || trimmed.startsWith('[')) {
+                    try {
+                        const parsedResponse = JSON.parse(trimmed);
+                        // If it parses to an object with response/code/action fields, extract them
+                        if (parsedResponse.response || parsedResponse.code || parsedResponse.action) {
+                            // Merge parsed fields into response object
+                            if (parsedResponse.response && typeof parsedResponse.response === 'string') {
+                                response.response = parsedResponse.response;
+                            }
+                            if (parsedResponse.code && !response.code) {
+                                response.code = parsedResponse.code;
+                            }
+                            if (parsedResponse.action && !response.action) {
+                                response.action = parsedResponse.action;
+                            }
+                            if (parsedResponse.narration && !response.narration) {
+                                response.narration = parsedResponse.narration;
+                            }
+                            if (parsedResponse.memoryUpdates && !response.memoryUpdates) {
+                                response.memoryUpdates = parsedResponse.memoryUpdates;
+                            }
+                        }
+                    } catch (e) {
+                        // Not valid JSON, might be escaped - try unescaping common patterns
+                        try {
+                            const unescaped = trimmed
+                                .replace(/\\n/g, '\n')
+                                .replace(/\\"/g, '"')
+                                .replace(/\\\\/g, '\\')
+                                .replace(/\\t/g, '\t');
+                            const parsedResponse = JSON.parse(unescaped);
+                            if (parsedResponse.response || parsedResponse.code || parsedResponse.action) {
+                                if (parsedResponse.response && typeof parsedResponse.response === 'string') {
+                                    response.response = parsedResponse.response;
+                                }
+                                if (parsedResponse.code && !response.code) response.code = parsedResponse.code;
+                                if (parsedResponse.action && !response.action) response.action = parsedResponse.action;
+                                if (parsedResponse.narration && !response.narration) response.narration = parsedResponse.narration;
+                                if (parsedResponse.memoryUpdates && !response.memoryUpdates) response.memoryUpdates = parsedResponse.memoryUpdates;
+                            }
+                        } catch (e2) {
+                            // Still not JSON, use as-is
+                        }
+                    }
+                }
+            }
+            
+            // Add Void response to chat
+            if (response.response) {
+                const voidMsg = document.createElement('div');
+                voidMsg.style.color = '#aa88ff';
+                voidMsg.style.marginBottom = '10px';
+                voidMsg.style.whiteSpace = 'pre-wrap';
+                voidMsg.innerHTML = `<strong>The Void:</strong> ${response.response}`;
+                chatLog.appendChild(voidMsg);
+                chatLog.scrollTop = chatLog.scrollHeight;
+                
+                // Save to conversation history
+                VoidMemoryStore.addMessage('void', response.response);
+            }
+            
+            // Apply action (Oracle mode)
+            if (response.action && VoidBridge.config.mode === 'oracle') {
+                VoidSystem.applyAction(this.game, response.action);
+                
+                // Show narration if present
+                if (response.action.narration) {
+                    const narrMsg = document.createElement('div');
+                    narrMsg.style.color = '#ffaa88';
+                    narrMsg.style.fontStyle = 'italic';
+                    narrMsg.style.marginBottom = '10px';
+                    narrMsg.textContent = response.action.narration;
+                    chatLog.appendChild(narrMsg);
+                    chatLog.scrollTop = chatLog.scrollHeight;
+                }
+            }
+            
+            // Handle code execution (Unbound mode) - NO CONFIRMATION
+            if (response.code && VoidBridge.config.mode === 'unbound') {
+                // Use the helper function for chained retries
+                // maxErrorRetries: 3 (prevent infinite error loops)
+                // maxProbeChain: 50 (allow extensive exploration)
+                await handleCodeExecution(response.code, 0, 0, 3, 50);
+            }
+            
+            // Show narration if present (separate from action narration)
+            if (response.narration) {
+                const narrMsg = document.createElement('div');
+                narrMsg.style.color = '#ffaa88';
+                narrMsg.style.fontStyle = 'italic';
+                narrMsg.style.marginBottom = '10px';
+                narrMsg.textContent = response.narration;
+                chatLog.appendChild(narrMsg);
+                chatLog.scrollTop = chatLog.scrollHeight;
+            }
+            
+            // Update memory
+            if (response.memoryUpdates) {
+                VoidMemoryStore.applyPatch(response.memoryUpdates);
+            }
+            
+            // Update conversation count
+            voidMemory.conversationCount = (voidMemory.conversationCount || 0) + 1;
+            VoidMemoryStore.save();
+        };
+        
+        // Allow Enter to send (Shift+Enter for new line) and prevent game input from seeing keys
+        inputField.onkeydown = (e) => {
+            // Prevent global game Input from treating keys (like 'E') as interaction while typing
+            e.stopPropagation();
+            if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                sendBtn.click();
+            }
+        };
+        
+        actionsDiv.appendChild(sendBtn);
+        actionsDiv.appendChild(rateLimitStatus);
+        inputSection.appendChild(actionsDiv);
+        this.optionsEl.appendChild(inputSection);
         
         // Close button
         const closeBtn = document.createElement('button');

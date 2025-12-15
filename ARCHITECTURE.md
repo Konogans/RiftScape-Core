@@ -1,6 +1,6 @@
 # RiftScape Engine Architecture
 
-**Version:** 3.1  
+**Version:** 3.2  
 **Last Updated:** January 2025
 
 This document provides a comprehensive overview of the RiftScape engine's architecture, design patterns, and system organization.
@@ -75,13 +75,32 @@ The engine is organized into distinct systems, each handling a specific domain:
 
 The engine uses global state for core systems:
 
+**Window Properties:**
 ```javascript
-window.game          // Main Game instance
-window.WorldState    // World generation and node graph
+window.game          // Main Game instance (set after page load)
+window.WorldState    // WorldState object (const global, also on window)
 window.WorldManager  // WorldManager class (instantiated per Game)
-window.ModManager    // ModManager instance (attached to Game)
 window.HubState      // HubState class (static methods)
 window.PSXify        // Material shader patcher function
+```
+
+**Bare Const Globals (not on window, accessible directly):**
+```javascript
+MetaProgression      // Meta-progression system (const global)
+EntityRegistry       // Enemy definitions registry
+AbilityRegistry      // Player abilities registry
+CharacterRegistry    // Playable characters registry
+EquipmentRegistry    // Equippable items registry
+NPCRegistry         // NPC definitions registry
+UpgradeRegistry     // Meta-progression upgrades registry
+BiomeRegistry       // World biomes registry
+StructureRegistry   // Placeable structures registry
+PickupRegistry      // Loot pickups registry
+BehaviorSystem      // Enemy AI system
+AttackSystem        // Attack pattern system
+VoidBridge          // Void Entity API bridge
+VoidSystem          // Void Entity code execution system
+VoidMemoryStore     // Void Entity memory persistence
 ```
 
 ### Access Patterns
@@ -117,8 +136,6 @@ window.RiftScape = {
     EntityRegistry: EntityRegistry,
     CharacterRegistry: CharacterRegistry,
     UpgradeRegistry: UpgradeRegistry,
-    EquipmentRegistry: EquipmentRegistry,
-    NPCRegistry: NPCRegistry,
     BiomeRegistry: BiomeRegistry,
     StructureRegistry: StructureRegistry,
     PickupRegistry: PickupRegistry,
@@ -128,6 +145,10 @@ window.RiftScape = {
     MetaProgression: MetaProgression
 };
 ```
+
+**Note:** `EquipmentRegistry` and `NPCRegistry` are defined as `const` globals (not on `window`) and are accessible directly. They are not currently in the `window.RiftScape` namespace, but can be accessed as bare globals: `EquipmentRegistry.get('battleaxe')` or `NPCRegistry.get('pedalboard')`.
+
+**Void Entity Systems:** `VoidBridge`, `VoidSystem`, and `VoidMemoryStore` are also `const` globals (not on `window`) and are accessible directly for Void Entity functionality.
 
 **Backward Compatibility:** All existing `window.*` access still works. New code should prefer `window.RiftScape.*` to reduce global namespace pollution.
 

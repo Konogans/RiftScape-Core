@@ -121,3 +121,14 @@ NPCRegistry.register('reset', {
     uiType: 'reset' // Uses reset UI
 });
 
+// 8. The Void Entity - LLM-powered game master
+NPCRegistry.register('void', {
+    name: 'The Void',
+    role: 'void',
+    greeting: 'The space between rifts looks back.',
+    characterId: null,
+    affinityType: null,
+    shopInventory: [],
+    uiType: 'void' // Uses void UI (LLM integration)
+});
+

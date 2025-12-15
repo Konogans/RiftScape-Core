@@ -371,6 +371,10 @@ class Game {
 		const resetNPC = new NPC(this, 0, -8, "The Forgotten", "reset", 0x333333);
 		this.entities.push(resetNPC); this.scene.add(resetNPC.mesh);
 		
+		// The Void Entity (LLM-powered game master)
+		const voidNPC = new NPC(this, -10, -8, "The Void", "void", 0x552288);
+		this.entities.push(voidNPC); this.scene.add(voidNPC.mesh);
+		
         // 4. Create a "Rift Gate" (Portal to start run)
         // Instead of a button, we now have a physical object to walk into
         /*const riftGate = new Portal(this, 0, 10, 'NEW_RUN', 'ENTER THE RIFT');
@@ -470,6 +474,7 @@ class Game {
 			targets.push({ x: 8, z: 0, name: "The Tinkerer" }); // Always available
 			targets.push({ x: -8, z: 0, name: "The Armorer" }); // Equipment manager
 			targets.push({ x: 0, z: -5, name: "The Trader" }); // Sell items
+			targets.push({ x: -10, z: -8, name: "The Void" }); // LLM game master
             
             // Optional: Point to reset NPC if you want
             // targets.push({ x: 0, z: -8, name: "The Forgotten" });

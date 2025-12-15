@@ -1,6 +1,6 @@
 # RiftScape Engine API Reference
 
-**Version:** 3.1  
+**Version:** 3.2  
 **Last Updated:** January 2025
 
 This document provides API reference for public interfaces and commonly accessed systems.
@@ -11,16 +11,42 @@ This document provides API reference for public interfaces and commonly accessed
 
 ### Core Systems
 
+**Window Properties:**
 ```javascript
 // Main game instance (set after page load)
 window.game              // Game instance
 
-// Static systems
-window.WorldState        // World generation and node graph
+// Static systems (also available as bare globals)
+window.WorldState        // WorldState object (world generation and node graph)
 window.WorldManager      // WorldManager class (instantiated per Game)
 window.HubState          // HubState class (static methods)
-window.ModManager        // ModManager instance (attached to Game)
 window.PSXify            // Material shader patcher function
+```
+
+**Bare Const Globals (accessible directly, not on window):**
+```javascript
+// Core Systems
+MetaProgression          // Meta-progression system (data persistence, upgrades, equipment)
+
+// Registries (all follow same pattern: register(), get(), list())
+EntityRegistry           // Enemy definitions
+AbilityRegistry          // Player abilities
+CharacterRegistry        // Playable characters
+EquipmentRegistry        // Equippable weapons and trinkets
+NPCRegistry             // NPC definitions (dialogue, shops)
+UpgradeRegistry          // Meta-progression upgrades
+BiomeRegistry            // World biomes
+StructureRegistry        // Placeable structures
+PickupRegistry           // Loot pickups
+
+// Gameplay Systems
+BehaviorSystem           // Enemy AI behaviors
+AttackSystem             // Attack pattern execution
+
+// Void Entity Systems (for LLM integration)
+VoidBridge               // API communication bridge
+VoidSystem               // Code execution and action system
+VoidMemoryStore          // Persistent memory for Void Entity
 ```
 
 ### Game Instance Properties
