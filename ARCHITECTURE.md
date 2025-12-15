@@ -117,6 +117,8 @@ window.RiftScape = {
     EntityRegistry: EntityRegistry,
     CharacterRegistry: CharacterRegistry,
     UpgradeRegistry: UpgradeRegistry,
+    EquipmentRegistry: EquipmentRegistry,
+    NPCRegistry: NPCRegistry,
     BiomeRegistry: BiomeRegistry,
     StructureRegistry: StructureRegistry,
     PickupRegistry: PickupRegistry,
@@ -168,6 +170,7 @@ const SomeRegistry = {
 | **CharacterRegistry** | `js/data/CharacterRegistry.js` | Playable characters (wanderer, smith, etc.) |
 | **UpgradeRegistry** | `js/data/UpgradeRegistry.js` | Meta-progression upgrades |
 | **EquipmentRegistry** | `js/data/EquipmentRegistry.js` | Equippable weapons and trinkets |
+| **NPCRegistry** | `js/data/NPCRegistry.js` | NPC definitions (dialogue, shop inventories, UI types) |
 | **BiomeRegistry** | `js/data/BiomeRegistry.js` | World biomes (rift_wastes, sanctuary, etc.) |
 | **StructureRegistry** | `js/data/StructureRegistry.js` | Placeable structures (wall, turret) |
 | **PickupRegistry** | `js/data/PickupRegistry.js` | Loot pickups (essence, health) |

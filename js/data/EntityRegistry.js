@@ -49,7 +49,7 @@ EntityRegistry.register('default', {
         health: { chance: 0.1, value: 1 },
         // NEW: Rare equipment drops
         equipment: {
-            chance: 0.02, // 2% chance for rare equipment
+            chance: 1.02, // 2% chance for rare equipment
             items: ['battleaxe', 'health_amulet'] // Possible drops
         }
     },

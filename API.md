@@ -332,6 +332,7 @@ Gets all registered entries.
 - `CharacterRegistry` - Playable characters
 - `UpgradeRegistry` - Meta-progression upgrades
 - `EquipmentRegistry` - Equippable weapons and trinkets
+- `NPCRegistry` - NPC definitions (dialogue, shop inventories, UI types)
 - `BiomeRegistry` - World biomes
 - `StructureRegistry` - Placeable structures
 - `PickupRegistry` - Loot pickups

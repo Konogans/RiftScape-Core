@@ -15,10 +15,14 @@ class DialogueSystem {
         this.overlay.classList.remove('hidden');
         this.game.input.clear(); // Prevent accidental clicks
         
-        this.nameEl.textContent = npc.name;
-        this.textEl.textContent = this.getGreeting(npc.role);
+        // Get NPC definition from registry (fallback to npc object if not found)
+        const npcDef = NPCRegistry.get(npc.role) || { name: npc.name, role: npc.role, greeting: "Greetings.", uiType: 'shop' };
         
-        this.updateShop(npc);
+        this.nameEl.textContent = npcDef.name || npc.name;
+        this.textEl.textContent = npcDef.greeting || "Greetings.";
+        
+        // Route to appropriate UI based on NPC definition
+        this.updateShop(npc, npcDef);
     }
     
     close() {
@@ -26,68 +30,28 @@ class DialogueSystem {
         this.overlay.classList.add('hidden');
         this.game.input.clear();
     }
-    
-	getGreeting(role) {
-		const greetings = {
-			smith: "The flesh is weak. Improve the hardware.",
-			scribe: "Knowledge is power. Expand your mind.",
-			builder: "The battlefield is a canvas. Build your defenses.",
-			pedalboard: "Customize your loadout. Each slot defines your combat style.",
-			equipment: "Arm yourself. Choose your weapon and trinkets.",
-			trader: "I'll buy your loot. Show me what you've found.",
-			'reset': "To begin again is to lose everything. Are you certain?" // NEW
-		};
-		return greetings[role] || "Greetings.";
-	}
 
-    updateShop(npc) {
+    updateShop(npc, npcDef) {
         this.essenceEl.textContent = `◆ ${MetaProgression.data.essence}`;
         this.optionsEl.innerHTML = '';
         
-        // PEDALBOARD UI for Pedalboard Customizer
-        if (npc.role === 'pedalboard') {
+        // Route to appropriate UI based on NPC definition
+        if (npcDef.uiType === 'pedalboard') {
             this.updatePedalboard(npc);
             return;
         }
         
-        // EQUIPMENT UI for Equipment Manager
-        if (npc.role === 'equipment') {
+        if (npcDef.uiType === 'equipment') {
             this.updateEquipment(npc);
             return;
         }
         
-        // TRADER UI for selling items
-        if (npc.role === 'trader') {
+        if (npcDef.uiType === 'trader') {
             this.updateTrader(npc);
             return;
         }
         
-        const allUpgrades = UpgradeRegistry.list();
-        
-        // DEBUG LOGS
-        console.log(`[Shop] Opening shop for: ${npc.name} (Role: ${npc.role})`);
-        console.log(`[Shop] Total upgrades found in registry: ${allUpgrades.length}`);
-
-
-        let shopInventory = [];
-        
-        if (npc.role === 'smith') {
-            shopInventory = allUpgrades.filter(u => 
-                // Added 'dash_unlock'
-                ['dash_unlock', 'vitality1', 'vitality2', 'reserves1', 'tech_armor', 'tech_speed', 'swiftness1'].includes(u.id)
-            );
-        } else if (npc.role === 'scribe') {
-            shopInventory = allUpgrades.filter(u => 
-                // Added 'slam_unlock'
-                ['slam_unlock', 'magic_regen', 'magic_burst'].includes(u.id)
-            );
-        } else if (npc.role === 'builder') {
-            // Architect shop - structure/defense related upgrades
-            shopInventory = allUpgrades.filter(u => 
-                // Add structure-related upgrades here when they exist
-                ['dash_unlock'].includes(u.id) // Placeholder - add actual builder upgrades
-            );
-        } else if (npc.role === 'reset') {
+        if (npcDef.uiType === 'reset') {
 			
 			// 1. REVERT TO WANDERER (If not currently Wanderer)
 			if (MetaProgression.data.currentCharacter !== 'wanderer') {
@@ -147,7 +111,11 @@ class DialogueSystem {
 			return; // Stop here
 		}
         
-        console.log(`[Shop] Items matching role: ${shopInventory.length}`);
+        // Get shop inventory from NPC definition
+        const allUpgrades = UpgradeRegistry.list();
+        const shopInventory = allUpgrades.filter(u => 
+            npcDef.shopInventory && npcDef.shopInventory.includes(u.id)
+        );
         
         if (shopInventory.length === 0) {
             const msg = document.createElement('div');
@@ -162,7 +130,6 @@ class DialogueSystem {
             
             // If we own it, skip rendering (cleaner menu)
             if (owned) {
-                console.log(`[Shop] Hiding owned item: ${upgrade.name}`);
                 return; 
             }
             
@@ -188,9 +155,10 @@ class DialogueSystem {
 						}
 						
                         this.textEl.textContent = `Acquired: ${upgrade.name}. System integrated.`;
-                        this.updateShop(npc); 
-                        if (npc.role === 'smith') MetaProgression.data.techAffinity++;
-                        if (npc.role === 'scribe') MetaProgression.data.magicAffinity++;
+                        this.updateShop(npc, npcDef);
+                        // Apply affinity bonus if NPC has one
+                        if (npcDef.affinityType === 'tech') MetaProgression.data.techAffinity++;
+                        if (npcDef.affinityType === 'magic') MetaProgression.data.magicAffinity++;
                         MetaProgression.save();
                     } else {
                         this.textEl.textContent = "Insufficient Essence.";
@@ -204,11 +172,11 @@ class DialogueSystem {
         });
 		
 		// 1. CHARACTER SWAP BUTTON (If applicable)
-		// Garrick = Smith, Elara = Scribe
-		const targetCharId = npc.role; // Convenient mapping!
+		// Only show if NPC explicitly has a characterId (not null/undefined)
+		const targetCharId = npcDef.characterId;
 		
-		// Only show if this NPC corresponds to a playable class
-		if (CharacterRegistry.characters[targetCharId]) {
+		// Only show if this NPC corresponds to a playable class and characterId is explicitly set
+		if (targetCharId && CharacterRegistry.get(targetCharId)) {
 			const charDef = CharacterRegistry.get(targetCharId);
 			const isUnlocked = MetaProgression.data.unlockedCharacters.includes(targetCharId);
 			const isCurrent = MetaProgression.data.currentCharacter === targetCharId;
@@ -257,8 +225,17 @@ class DialogueSystem {
     }
 	
 	openRiftMenu(gate) {
-        this.open({ name: "RIFT GATE", role: "gate" }); // Hack: pass fake NPC object
+        // Open dialogue overlay but don't call updateShop (which adds a close button)
+        this.isOpen = true;
+        this.overlay.classList.remove('hidden');
+        this.game.input.clear();
+        
+        // Set name and text manually
+        this.nameEl.textContent = "RIFT GATE";
         this.textEl.textContent = "The crystal hums with unstable energy.";
+        
+        // Clear options (in case updateShop was called)
+        this.optionsEl.innerHTML = '';
         
         // Option 1: Enter Rift
         const btnEnter = document.createElement('button');
@@ -286,12 +263,20 @@ class DialogueSystem {
     }
 	
 	openRaidPauseMenu() {
-        this.open({ name: "SIEGE PROTOCOL", role: "gate" });
+        // Open dialogue overlay but don't call updateShop (which adds a close button)
+        this.isOpen = true;
+        this.overlay.classList.remove('hidden');
+        this.game.input.clear();
+        
+        // Set name and text manually
+        this.nameEl.textContent = "SIEGE PROTOCOL";
         const level = this.game.raidManager.raidLevel;
         const nextLevel = level + 1;
         const reward = 500 * level;
-        
         this.textEl.innerHTML = `Wave sequence complete.<br>Threat Level: ${level}<br>Pending Reward: <span style="color:#ffcc44">${reward} Essence</span>`;
+        
+        // Clear options (in case updateShop was called)
+        this.optionsEl.innerHTML = '';
         
         // Option 1: CONTINUE (Risk it all)
         const btnCont = document.createElement('button');
