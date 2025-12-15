@@ -17,7 +17,8 @@ const VoidBridge = {
         apiKey: null,        // Stored locally via UI; not committed
         // Default to user's Cloudflare proxy; can be overridden in UI
         endpoint: 'https://llm-proxy.simag55.workers.dev',
-        model: 'claude-sonnet-4-20250514' // Safe default; UI can override
+        provider: 'anthropic',  // 'anthropic' | 'openai' | 'gemini'
+        model: 'claude-sonnet-4-20250514' // Model name (varies by provider)
     },
     
     // Rate limit tracking
@@ -289,7 +290,7 @@ Do not include any extra text before or after the JSON. No markdown. No prose.
         });
 
         const proxyBody = {
-            provider: 'anthropic',
+            provider: this.config.provider || 'anthropic',
             apiKey: this.config.apiKey,
             model: this.config.model,
             system: systemPrompt,
@@ -387,7 +388,17 @@ Do not include any extra text before or after the JSON. No markdown. No prose.
 
             // data.content should be the JSON string from the model
             try {
-                let parsed = JSON.parse(data.content);
+                // Strip markdown code blocks if present (```json ... ``` or ``` ... ```)
+                let content = String(data.content || '').trim();
+                if (content.startsWith('```')) {
+                    // Remove opening code block (```json or ```)
+                    content = content.replace(/^```(?:json)?\s*\n?/, '');
+                    // Remove closing code block (```)
+                    content = content.replace(/\n?```\s*$/, '');
+                    content = content.trim();
+                }
+                
+                let parsed = JSON.parse(content);
                 
                 // Check if response field contains JSON that needs to be parsed (double-stringified case)
                 if (parsed.response && typeof parsed.response === 'string') {
@@ -431,7 +442,14 @@ Do not include any extra text before or after the JSON. No markdown. No prose.
                 console.error('[VoidBridge] Failed to parse Void JSON (first pass):', e, data.content);
 
                 // Second chance: try multiple repair strategies
-                const raw = String(data.content || '');
+                let raw = String(data.content || '').trim();
+                
+                // Strip markdown code blocks if present (```json ... ``` or ``` ... ```)
+                if (raw.startsWith('```')) {
+                    raw = raw.replace(/^```(?:json)?\s*\n?/, '');
+                    raw = raw.replace(/\n?```\s*$/, '');
+                    raw = raw.trim();
+                }
                 
                 // Strategy 1: Try unescaping common escape sequences
                 try {

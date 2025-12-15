@@ -888,6 +888,156 @@ class DialogueSystem {
         };
         configSection.appendChild(modeDiv);
         
+        // Provider selector
+        const providerDiv = document.createElement('div');
+        providerDiv.style.marginBottom = '10px';
+        const currentProvider = VoidBridge.config.provider || 'anthropic';
+        providerDiv.innerHTML = `
+            <label style="color:#aaa; font-size:12px; display:block; margin-bottom:5px;">LLM Provider:</label>
+            <select id="void-provider" style="width:100%; padding:5px; background:#223344; border:1px solid #557799; color:#fff; font-family:'Courier New', monospace;">
+                <option value="anthropic" ${currentProvider === 'anthropic' ? 'selected' : ''}>Anthropic (Claude)</option>
+                <option value="openai" ${currentProvider === 'openai' ? 'selected' : ''}>OpenAI (GPT)</option>
+                <option value="gemini" ${currentProvider === 'gemini' ? 'selected' : ''}>Google (Gemini)</option>
+            </select>
+        `;
+        const providerSelect = providerDiv.querySelector('#void-provider');
+        
+        // Model selector (updates based on provider)
+        const modelDiv = document.createElement('div');
+        modelDiv.style.marginBottom = '10px';
+        const currentModel = VoidBridge.config.model || 'claude-sonnet-4-20250514';
+        
+        const getModelsForProvider = (provider) => {
+            switch(provider) {
+                case 'anthropic':
+                    return [
+                        { value: 'claude-sonnet-4-20250514', label: 'Claude Sonnet 4' },
+                        { value: 'claude-3-5-sonnet-20241022', label: 'Claude 3.5 Sonnet' },
+                        { value: 'claude-3-opus-20240229', label: 'Claude 3 Opus' },
+                        { value: 'claude-3-sonnet-20240229', label: 'Claude 3 Sonnet' },
+                        { value: 'claude-3-haiku-20240307', label: 'Claude 3 Haiku' }
+                    ];
+                case 'openai':
+                    return [
+                        { value: 'gpt-4o', label: 'GPT-4o' },
+                        { value: 'gpt-4-turbo', label: 'GPT-4 Turbo' },
+                        { value: 'gpt-4', label: 'GPT-4' },
+                        { value: 'gpt-3.5-turbo', label: 'GPT-3.5 Turbo' }
+                    ];
+                case 'gemini':
+                    return [
+                        { value: 'gemini-2.0-flash', label: 'Gemini 2.0 Flash' },
+                        { value: 'gemini-1.5-pro', label: 'Gemini 1.5 Pro' },
+                        { value: 'gemini-1.5-flash', label: 'Gemini 1.5 Flash' }
+                    ];
+                default:
+                    return [];
+            }
+        };
+        
+        const updateModelSelector = (provider) => {
+            const models = getModelsForProvider(provider);
+            const modelSelect = modelDiv.querySelector('#void-model');
+            const customInput = modelDiv.querySelector('#void-model-custom');
+            
+            // Remove custom input if it exists
+            if (customInput) {
+                customInput.parentElement.remove();
+            }
+            
+            // Update model options
+            modelSelect.innerHTML = '';
+            models.forEach(model => {
+                const option = document.createElement('option');
+                option.value = model.value;
+                option.textContent = model.label;
+                if (VoidBridge.config.model === model.value) {
+                    option.selected = true;
+                }
+                modelSelect.appendChild(option);
+            });
+            
+            // Add custom option
+            const customOption = document.createElement('option');
+            customOption.value = 'custom';
+            customOption.textContent = 'Custom (enter below)';
+            const isCustom = !models.some(m => m.value === VoidBridge.config.model);
+            if (isCustom) {
+                customOption.selected = true;
+                // Show custom input
+                const customDiv = document.createElement('div');
+                customDiv.style.marginTop = '5px';
+                customDiv.innerHTML = `
+                    <input type="text" id="void-model-custom" placeholder="Enter model name" 
+                           value="${VoidBridge.config.model || ''}" 
+                           style="width:100%; padding:5px; background:#223344; border:1px solid #557799; color:#fff; font-family:'Courier New', monospace; font-size:11px;">
+                `;
+                modelDiv.appendChild(customDiv);
+                const input = customDiv.querySelector('#void-model-custom');
+                input.onchange = () => {
+                    VoidBridge.config.model = input.value;
+                    VoidBridge.saveConfig();
+                };
+            }
+            modelSelect.appendChild(customOption);
+        };
+        
+        modelDiv.innerHTML = `
+            <label style="color:#aaa; font-size:12px; display:block; margin-bottom:5px;">Model:</label>
+            <select id="void-model" style="width:100%; padding:5px; background:#223344; border:1px solid #557799; color:#fff; font-family:'Courier New', monospace;">
+            </select>
+        `;
+        
+        // Initialize model selector
+        updateModelSelector(currentProvider);
+        
+        // Handle provider change
+        providerSelect.onchange = () => {
+            VoidBridge.config.provider = providerSelect.value;
+            // Set default model for provider if current model doesn't match
+            const models = getModelsForProvider(providerSelect.value);
+            if (!models.some(m => m.value === VoidBridge.config.model)) {
+                VoidBridge.config.model = models[0].value;
+            }
+            VoidBridge.saveConfig();
+            updateModelSelector(providerSelect.value);
+        };
+        
+        // Handle model change
+        const modelSelect = modelDiv.querySelector('#void-model');
+        modelSelect.onchange = () => {
+            if (modelSelect.value === 'custom') {
+                // Show custom input
+                const customInput = modelDiv.querySelector('#void-model-custom');
+                if (!customInput) {
+                    const customDiv = document.createElement('div');
+                    customDiv.style.marginTop = '5px';
+                    customDiv.innerHTML = `
+                        <input type="text" id="void-model-custom" placeholder="Enter model name" 
+                               value="${VoidBridge.config.model || ''}" 
+                               style="width:100%; padding:5px; background:#223344; border:1px solid #557799; color:#fff; font-family:'Courier New', monospace; font-size:11px;">
+                    `;
+                    modelDiv.appendChild(customDiv);
+                    const input = customDiv.querySelector('#void-model-custom');
+                    input.onchange = () => {
+                        VoidBridge.config.model = input.value;
+                        VoidBridge.saveConfig();
+                    };
+                }
+            } else {
+                // Remove custom input if it exists
+                const customInput = modelDiv.querySelector('#void-model-custom');
+                if (customInput) {
+                    customInput.parentElement.remove();
+                }
+                VoidBridge.config.model = modelSelect.value;
+                VoidBridge.saveConfig();
+            }
+        };
+        
+        configSection.appendChild(providerDiv);
+        configSection.appendChild(modelDiv);
+        
         // API Endpoint
         const endpointDiv = document.createElement('div');
         endpointDiv.style.marginBottom = '10px';
