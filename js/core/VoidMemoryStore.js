@@ -44,6 +44,7 @@ const VoidMemoryStore = {
         } catch (e) {
             console.warn('[VoidMemoryStore] Failed to load memory:', e);
             this.data = this.getDefaultMemory();
+            this.save(); // Persist the fix to clear corrupted data
         }
         
         return this.data;

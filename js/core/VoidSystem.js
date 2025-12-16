@@ -241,6 +241,10 @@ const VoidSystem = {
                 timestamp: new Date().toISOString(),
                 code: code.substring(0, 200) // Truncate for storage
             });
+            // Keep only last 100 entries to prevent storage bloat
+            if (mem.codeExecuted.length > 100) {
+                mem.codeExecuted = mem.codeExecuted.slice(-100);
+            }
             VoidMemoryStore.save();
 
             // Execute in global scope with game context available
@@ -279,6 +283,10 @@ const VoidSystem = {
                 timestamp: new Date().toISOString(),
                 error: e.message
             });
+            // Keep only last 100 entries to prevent storage bloat
+            if (mem.errorsThrown.length > 100) {
+                mem.errorsThrown = mem.errorsThrown.slice(-100);
+            }
             VoidMemoryStore.save();
 
             return { 
@@ -286,41 +294,6 @@ const VoidSystem = {
                 error: e.message || 'Unknown error',
                 logs: capturedLogs.length > 0 ? capturedLogs : undefined
             };
-        }
-    },
-
-    /**
-     * Allows the Void to prompt itself with a new message
-     * This enables recursive self-reflection and iterative problem-solving
-     * @param {string} message - The message to send to yourself
-     * @param {Object} options - Optional configuration
-     * @param {boolean} options.waitForResponse - If true, waits for and returns the response (default: false)
-     * @returns {Promise<Object|null>} The response if waitForResponse is true, otherwise null
-     */
-    async promptSelf(message, options = {}) {
-        if (!window.game || !window.VoidBridge) {
-            console.warn('[VoidSystem] promptSelf requires window.game and window.VoidBridge');
-            return null;
-        }
-        
-        const { waitForResponse = false } = options;
-        
-        const payload = {
-            gameState: window.VoidBridge.buildGameState(window.game),
-            voidMemory: window.VoidMemoryStore.load(),
-            mode: window.VoidBridge.config.mode,
-            playerMessage: message,
-            isSelfCall: true  // Flag for auto-retry
-        };
-        
-        if (waitForResponse) {
-            return await window.VoidBridge.sendRequest(payload);
-        } else {
-            // Fire and forget - don't wait for response
-            window.VoidBridge.sendRequest(payload).catch(err => {
-                console.error('[VoidSystem] Error in promptSelf:', err);
-            });
-            return null;
         }
     },
 
