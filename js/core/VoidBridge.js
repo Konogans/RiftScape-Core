@@ -18,7 +18,8 @@ const VoidBridge = {
         // Default to user's Cloudflare proxy; can be overridden in UI
         endpoint: 'https://llm-proxy.simag55.workers.dev',
         provider: 'anthropic',  // 'anthropic' | 'openai' | 'gemini'
-        model: 'claude-sonnet-4-20250514' // Model name (varies by provider)
+        model: 'claude-sonnet-4-20250514', // Model name (varies by provider)
+        maxTokens: 8192  // Max tokens for response (higher for code generation)
     },
     
     // Rate limit tracking
@@ -297,7 +298,7 @@ Do not include any extra text before or after the JSON. No markdown. No prose.
             messages: [
                 { role: 'user', content: userContent }
             ],
-            max_tokens: 2048
+            max_tokens: this.config.maxTokens || 8192  // Higher default for code generation
         };
 
         try {
@@ -439,7 +440,13 @@ Do not include any extra text before or after the JSON. No markdown. No prose.
                 
                 return parsed;
             } catch (e) {
-                console.error('[VoidBridge] Failed to parse Void JSON (first pass):', e, data.content);
+                console.error('[VoidBridge] Failed to parse Void JSON (first pass):', e);
+                // Log a preview of the content for debugging (first 500 chars)
+                const preview = String(data.content || '').substring(0, 500);
+                console.error('[VoidBridge] Content preview:', preview);
+                if (data.content && data.content.length > 500) {
+                    console.error('[VoidBridge] Content length:', data.content.length, 'chars (truncated in log)');
+                }
 
                 // Second chance: try multiple repair strategies
                 let raw = String(data.content || '').trim();
@@ -508,19 +515,216 @@ Do not include any extra text before or after the JSON. No markdown. No prose.
                     console.warn('[VoidBridge] Successfully repaired JSON by fixing syntax errors.');
                     return repaired;
                 } catch (e3) {
-                    console.error('[VoidBridge] All JSON repair strategies failed:', e3);
+                    // Strategy 3 failed, try next
                 }
+                
+                // Strategy 4: Try to fix unterminated strings by finding field boundaries
+                try {
+                    let fixed = raw;
+                    
+                    // Helper to find and fix a string field
+                    const fixStringField = (fieldName, fixedStr) => {
+                        // Look for "fieldName": "value...
+                        const fieldPattern = new RegExp(`"${fieldName}":\\s*"`, 'g');
+                        let match;
+                        const fixes = [];
+                        
+                        while ((match = fieldPattern.exec(fixedStr)) !== null) {
+                            const fieldStart = match.index + match[0].length;
+                            // Look for where this field should end - next field or closing brace
+                            const endPatterns = [
+                                /",\s*"(?:memoryUpdates|narration|response|code|action)":/,  // Next field
+                                /",\s*}\s*$/,  // End of object
+                                /\s*}\s*$/     // End of object (no comma)
+                            ];
+                            
+                            let foundEnd = false;
+                            let fieldEnd = -1;
+                            
+                            for (const endPattern of endPatterns) {
+                                const endMatch = fixedStr.substring(fieldStart).match(endPattern);
+                                if (endMatch) {
+                                    fieldEnd = fieldStart + endMatch.index;
+                                    foundEnd = true;
+                                    break;
+                                }
+                            }
+                            
+                            if (foundEnd && fieldEnd > fieldStart) {
+                                // Extract the raw value
+                                const rawValue = fixedStr.substring(fieldStart, fieldEnd);
+                                // Properly escape for JSON
+                                const escapedValue = rawValue
+                                    .replace(/\\/g, '\\\\')   // Escape backslashes first
+                                    .replace(/"/g, '\\"')      // Escape quotes
+                                    .replace(/\n/g, '\\n')     // Escape newlines
+                                    .replace(/\r/g, '\\r')     // Escape carriage returns
+                                    .replace(/\t/g, '\\t');     // Escape tabs
+                                
+                                fixes.push({
+                                    start: fieldStart,
+                                    end: fieldEnd,
+                                    replacement: escapedValue
+                                });
+                            }
+                        }
+                        
+                        // Apply fixes in reverse order to maintain indices
+                        fixes.reverse().forEach(fix => {
+                            fixedStr = fixedStr.substring(0, fix.start) + fix.replacement + fixedStr.substring(fix.end);
+                        });
+                        
+                        return fixedStr;
+                    };
+                    
+                    // Fix code field first (most likely to be problematic)
+                    fixed = fixStringField('code', fixed);
+                    // Fix response field
+                    fixed = fixStringField('response', fixed);
+                    // Fix narration field
+                    fixed = fixStringField('narration', fixed);
+                    
+                    const repaired = JSON.parse(fixed);
+                    console.warn('[VoidBridge] Successfully repaired JSON by fixing unterminated strings.');
+                    return repaired;
+                } catch (e4) {
+                    // Strategy 4 failed, try final extraction
+                }
+                
+                console.error('[VoidBridge] All JSON repair strategies failed:', e);
 
+                // Final attempt: Aggressive extraction and repair
+                let finalAttempt = String(data.content || '').trim();
+                
+                // Strip markdown
+                finalAttempt = finalAttempt.replace(/^```(?:json)?\s*\n?/g, '');
+                finalAttempt = finalAttempt.replace(/\n?```\s*$/g, '');
+                finalAttempt = finalAttempt.trim();
+                
+                // Find JSON boundaries
+                const firstBrace = finalAttempt.indexOf('{');
+                const lastBrace = finalAttempt.lastIndexOf('}');
+                if (firstBrace !== -1 && lastBrace !== -1 && lastBrace > firstBrace) {
+                    try {
+                        let jsonOnly = finalAttempt.slice(firstBrace, lastBrace + 1);
+                        
+                        // Helper to fix all string fields (including truncated ones)
+                        const fixAllStringFields = (jsonStr) => {
+                            const fields = ['code', 'response', 'narration'];
+                            let fixed = jsonStr;
+                            
+                            for (const field of fields) {
+                                const fieldPattern = new RegExp(`"${field}":\\s*"`, 'g');
+                                let match;
+                                const fixes = [];
+                                
+                                while ((match = fieldPattern.exec(fixed)) !== null) {
+                                    const fieldStart = match.index + match[0].length;
+                                    // Find the end - look for next field or closing brace
+                                    const endMatch = fixed.substring(fieldStart).match(/",\s*"(?:code|response|narration|memoryUpdates|action)":|",\s*}\s*$|\s*}\s*$/);
+                                    
+                                    if (endMatch) {
+                                        const fieldEnd = fieldStart + endMatch.index;
+                                        const rawValue = fixed.substring(fieldStart, fieldEnd);
+                                        // Escape properly
+                                        const escaped = rawValue
+                                            .replace(/\\/g, '\\\\')
+                                            .replace(/"/g, '\\"')
+                                            .replace(/\n/g, '\\n')
+                                            .replace(/\r/g, '\\r')
+                                            .replace(/\t/g, '\\t');
+                                        fixes.push({ start: fieldStart, end: fieldEnd, replacement: escaped });
+                                    } else {
+                                        // String field appears to be truncated - close it at the end of the JSON
+                                        // Find where the JSON actually ends (before any trailing garbage)
+                                        const jsonEnd = fixed.lastIndexOf('}');
+                                        if (jsonEnd > fieldStart) {
+                                            const rawValue = fixed.substring(fieldStart, jsonEnd).trim();
+                                            // Remove any trailing comma or partial field name
+                                            const cleanedValue = rawValue.replace(/,\s*$/, '').replace(/,\s*"[^"]*$/, '');
+                                            // Escape properly
+                                            const escaped = cleanedValue
+                                                .replace(/\\/g, '\\\\')
+                                                .replace(/"/g, '\\"')
+                                                .replace(/\n/g, '\\n')
+                                                .replace(/\r/g, '\\r')
+                                                .replace(/\t/g, '\\t');
+                                            // Close the string and add closing brace
+                                            fixes.push({ 
+                                                start: fieldStart, 
+                                                end: jsonEnd, 
+                                                replacement: escaped + '"',
+                                                needsBrace: true
+                                            });
+                                        }
+                                    }
+                                }
+                                
+                                // Apply fixes in reverse
+                                fixes.reverse().forEach(fix => {
+                                    fixed = fixed.substring(0, fix.start) + fix.replacement + fixed.substring(fix.end);
+                                    if (fix.needsBrace && !fixed.endsWith('}')) {
+                                        fixed += '}';
+                                    }
+                                });
+                            }
+                            
+                            return fixed;
+                        };
+                        
+                        jsonOnly = fixAllStringFields(jsonOnly);
+                        
+                        const parsed = JSON.parse(jsonOnly);
+                        console.warn('[VoidBridge] Successfully extracted JSON with aggressive field fixing.');
+                        return parsed;
+                    } catch (e3) {
+                        console.error('[VoidBridge] Final extraction attempt failed:', e3);
+                    }
+                } else if (firstBrace !== -1 && lastBrace === -1) {
+                    // JSON appears to be truncated (has opening brace but no closing brace)
+                    // Try to salvage by closing incomplete fields
+                    try {
+                        let jsonOnly = finalAttempt.slice(firstBrace);
+                        // Find the last incomplete string field and close it
+                        const incompleteStringMatch = jsonOnly.match(/"code":\s*"[^"]*$|"response":\s*"[^"]*$|"narration":\s*"[^"]*$/);
+                        if (incompleteStringMatch) {
+                            // Close the string and add closing brace
+                            const fieldEnd = incompleteStringMatch.index + incompleteStringMatch[0].length;
+                            const fieldValue = jsonOnly.substring(incompleteStringMatch.index, fieldEnd);
+                            const escaped = fieldValue
+                                .replace(/\\/g, '\\\\')
+                                .replace(/"/g, '\\"')
+                                .replace(/\n/g, '\\n')
+                                .replace(/\r/g, '\\r')
+                                .replace(/\t/g, '\\t');
+                            jsonOnly = jsonOnly.substring(0, incompleteStringMatch.index) + escaped + '"';
+                        }
+                        // Add closing brace if missing
+                        if (!jsonOnly.endsWith('}')) {
+                            jsonOnly += '}';
+                        }
+                        const parsed = JSON.parse(jsonOnly);
+                        console.warn('[VoidBridge] Successfully salvaged truncated JSON.');
+                        return parsed;
+                    } catch (e4) {
+                        console.error('[VoidBridge] Failed to salvage truncated JSON:', e4);
+                    }
+                }
+                
                 // If we still can't parse, return a special error response that DialogueSystem can detect
+                // Include the error position to help diagnose truncation issues
+                const errorPos = e.message.match(/position (\d+)/);
+                const errorInfo = errorPos ? ` (at position ${errorPos[1]} of ${(data.content || '').length} chars)` : '';
                 return {
-                    response: data.content || "The Void mutters something unintelligible.",
+                    response: finalAttempt || "The Void mutters something unintelligible.",
                     action: null,
                     code: null,
                     narration: null,
                     memoryUpdates: null,
                     _parseError: true,
-                    _parseErrorMessage: e.message,
-                    _rawContent: data.content
+                    _parseErrorMessage: e.message + errorInfo,
+                    _rawContent: data.content,
+                    _rawContentLength: (data.content || '').length
                 };
             }
         } catch (e) {

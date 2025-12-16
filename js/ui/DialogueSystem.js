@@ -1072,6 +1072,29 @@ class DialogueSystem {
         };
         configSection.appendChild(keyDiv);
         
+        // Max Tokens
+        const tokensDiv = document.createElement('div');
+        tokensDiv.style.marginBottom = '10px';
+        const currentMaxTokens = VoidBridge.config.maxTokens || 8192;
+        tokensDiv.innerHTML = `
+            <label style="color:#aaa; font-size:12px; display:block; margin-bottom:5px;">Max Tokens (response length):</label>
+            <input type="number" id="void-maxtokens" placeholder="8192" 
+                   value="${currentMaxTokens}" 
+                   min="512" max="32768" step="512"
+                   style="width:100%; padding:5px; background:#223344; border:1px solid #557799; color:#fff; font-family:'Courier New', monospace; font-size:11px;">
+        `;
+        const tokensInput = tokensDiv.querySelector('#void-maxtokens');
+        tokensInput.onchange = () => {
+            const value = parseInt(tokensInput.value, 10);
+            if (!isNaN(value) && value >= 512 && value <= 32768) {
+                VoidBridge.config.maxTokens = value;
+                VoidBridge.saveConfig();
+            } else {
+                tokensInput.value = currentMaxTokens;
+            }
+        };
+        configSection.appendChild(tokensDiv);
+        
         // Reset Memory button
         const resetDiv = document.createElement('div');
         resetDiv.style.marginTop = '10px';
@@ -1353,9 +1376,79 @@ class DialogueSystem {
             const feedbackResponse = await VoidBridge.sendRequest(feedbackPayload);
             hideThinking();
             
+            // Check for parse errors in feedback response
+            if (feedbackResponse && feedbackResponse._parseError) {
+                // Send parse error back to Void for correction (same as initial requests)
+                const parseErrorMsg = document.createElement('div');
+                parseErrorMsg.style.color = '#ff6666';
+                parseErrorMsg.style.marginBottom = '10px';
+                parseErrorMsg.style.fontStyle = 'italic';
+                parseErrorMsg.textContent = `[JSON Parse Error in feedback] ${feedbackResponse._parseErrorMessage}`;
+                chatLog.appendChild(parseErrorMsg);
+                chatLog.scrollTop = chatLog.scrollHeight;
+                
+                // Send correction request back to Void
+                const hideThinking2 = showThinking();
+                const parseErrorPayload = {
+                    gameState: VoidBridge.buildGameState(this.game),
+                    voidMemory: VoidMemoryStore.load(),
+                    mode: VoidBridge.config.mode,
+                    playerMessage: `Your previous response was not valid JSON. The parser error was: "${feedbackResponse._parseErrorMessage}". ${feedbackResponse._rawContentLength ? `Response length: ${feedbackResponse._rawContentLength} chars. ` : ''}Please return ONLY a valid JSON object with no extra text, markdown, or prose. If your response is being truncated, make it shorter.`,
+                    lastError: `JSON Parse Error: ${feedbackResponse._parseErrorMessage}`,
+                    lastCode: code,
+                    lastLogs: execResult.logs || null,
+                    lastRawContent: feedbackResponse._rawContent
+                };
+                
+                const parseErrorResponse = await VoidBridge.sendRequest(parseErrorPayload);
+                hideThinking2();
+                
+                if (parseErrorResponse && !parseErrorResponse._parseError && parseErrorResponse.response) {
+                    const retryMsg = document.createElement('div');
+                    retryMsg.style.color = '#aa88ff';
+                    retryMsg.style.marginBottom = '10px';
+                    retryMsg.style.whiteSpace = 'pre-wrap';
+                    retryMsg.innerHTML = `<strong>The Void (corrected):</strong> ${parseErrorResponse.response}`;
+                    chatLog.appendChild(retryMsg);
+                    chatLog.scrollTop = chatLog.scrollHeight;
+                    VoidMemoryStore.addMessage('void', parseErrorResponse.response);
+                    
+                    // Use corrected response and continue
+                    const correctedResponse = parseErrorResponse;
+                    // Extract JSON if needed and continue with chain
+                    if (correctedResponse.code) {
+                        await handleCodeExecution(
+                            correctedResponse.code,
+                            retryCount + 1,
+                            newErrorRetryCount,
+                            maxErrorRetries,
+                            maxProbeChain
+                        );
+                    }
+                } else {
+                    // Even the retry failed
+                    const failMsg = document.createElement('div');
+                    failMsg.style.color = '#ff6666';
+                    failMsg.style.marginBottom = '10px';
+                    failMsg.style.fontStyle = 'italic';
+                    failMsg.textContent = '[Failed to correct JSON parse error. Chain ended.]';
+                    chatLog.appendChild(failMsg);
+                    chatLog.scrollTop = chatLog.scrollHeight;
+                }
+                return;
+            }
+            
             // Extract JSON from response field if needed (do this BEFORE checking for code)
             if (feedbackResponse && feedbackResponse.response && typeof feedbackResponse.response === 'string') {
-                const trimmed = feedbackResponse.response.trim();
+                let trimmed = feedbackResponse.response.trim();
+                
+                // Strip markdown code blocks if present
+                if (trimmed.startsWith('```')) {
+                    trimmed = trimmed.replace(/^```(?:json)?\s*\n?/, '');
+                    trimmed = trimmed.replace(/\n?```\s*$/, '');
+                    trimmed = trimmed.trim();
+                }
+                
                 if (trimmed.startsWith('{') || trimmed.startsWith('[')) {
                     try {
                         const parsedResponse = JSON.parse(trimmed);
@@ -1482,7 +1575,7 @@ class DialogueSystem {
             };
             
             // Send request
-            const response = await VoidBridge.sendRequest(payload);
+            let response = await VoidBridge.sendRequest(payload);
             
             // Hide thinking indicator
             hideThinking();
@@ -1551,7 +1644,7 @@ class DialogueSystem {
                     gameState: VoidBridge.buildGameState(this.game),
                     voidMemory: VoidMemoryStore.load(),
                     mode: VoidBridge.config.mode,
-                    playerMessage: `Your previous response was not valid JSON. The parser error was: "${response._parseErrorMessage}". Please return ONLY a valid JSON object with no extra text, markdown, or prose.`,
+                    playerMessage: `Your previous response was not valid JSON. The parser error was: "${response._parseErrorMessage}". ${response._rawContentLength ? `Response length: ${response._rawContentLength} chars. ` : ''}Please return ONLY a valid JSON object with no extra text, markdown, or prose. If your response is being truncated, make it shorter.`,
                     lastError: `JSON Parse Error: ${response._parseErrorMessage}`,
                     lastCode: null,
                     lastRawContent: response._rawContent
@@ -1582,7 +1675,15 @@ class DialogueSystem {
             
             // Extract JSON from response field if needed (do this BEFORE checking for code/action)
             if (response.response && typeof response.response === 'string') {
-                const trimmed = response.response.trim();
+                let trimmed = response.response.trim();
+                
+                // Strip markdown code blocks if present
+                if (trimmed.startsWith('```')) {
+                    trimmed = trimmed.replace(/^```(?:json)?\s*\n?/, '');
+                    trimmed = trimmed.replace(/\n?```\s*$/, '');
+                    trimmed = trimmed.trim();
+                }
+                
                 // Check if it looks like JSON (starts with { or [)
                 if (trimmed.startsWith('{') || trimmed.startsWith('[')) {
                     try {
