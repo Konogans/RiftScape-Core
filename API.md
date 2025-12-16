@@ -42,11 +42,13 @@ PickupRegistry           // Loot pickups
 // Gameplay Systems
 BehaviorSystem           // Enemy AI behaviors
 AttackSystem             // Attack pattern execution
+```
 
-// Void Entity Systems (for LLM integration)
-VoidBridge               // API communication bridge
-VoidSystem               // Code execution and action system
-VoidMemoryStore          // Persistent memory for Void Entity
+**Window Properties (Void Entity Systems):**
+```javascript
+window.VoidBridge        // API communication bridge
+window.VoidSystem        // Code execution and action system
+window.VoidMemoryStore   // Persistent memory for Void Entity
 ```
 
 ### Game Instance Properties

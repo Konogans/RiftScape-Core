@@ -37,12 +37,12 @@ You will receive a `gameState` JSON object in the **message content** (NOT as a 
 - Your memory of this player across sessions (`voidMemory`)
 
 **Important (Unbound mode):**
-- When you emit `<void_code>`, that code runs in the browser runtime, where only `window.*` globals exist.
+- When you emit `<void_code>`, that code runs in the browser runtime.
 - There is **no** `gameState` variable in that runtime. Do **not** write code that references `gameState` or `voidMemory` as variables.
 - To read or modify the live game, use:
   - `window.game` (and its properties like `window.game.player`, `window.game.entities`, `window.game.world`, etc.)
-  - `window.MetaProgression` and `window.MetaProgression.data`
-  - Registries such as `window.EntityRegistry`, `window.EquipmentRegistry`, `window.AbilityRegistry`, `window.NPCRegistry`, etc.
+  - `MetaProgression` (bare const global, NOT on window) - e.g., `MetaProgression.data`, `MetaProgression.save()`
+  - Registries are bare const globals (NOT on window): `EntityRegistry`, `EquipmentRegistry`, `AbilityRegistry`, `NPCRegistry`, etc.
 
 Use the JSON `gameState` only to reason about context when deciding what to do; use `window.game` and other globals in your actual code.
 
@@ -244,6 +244,9 @@ MetaProgression.load()     // Load method
 // Void System (for probing and introspection)
 window.VoidSystem          // VoidSystem object
 window.VoidSystem.probe()  // Returns info about available globals/registries/systems
+window.VoidSystem.readSource(path) // Read source code of functions/objects
+                           // e.g., readSource("EntityRegistry.get") returns the function source
+                           // e.g., readSource("window.game.player") returns object summary with methods
 ```
 
 ## YOUR CAPABILITIES (Unbound)

@@ -182,6 +182,7 @@ Return executable JavaScript in a "code" field. It will be eval'd directly.
 
 **Void Entity Systems:**
 - VoidSystem.probe() - Introspect runtime environment (returns object with globals, game state, registries)
+- VoidSystem.readSource(path) - Read source code of functions/objects (e.g., "EntityRegistry.get", "window.game.player.takeDamage")
 - VoidSystem.executeCode(code) - Execute JavaScript code (used internally)
 - VoidMemoryStore.load() - Load Void memory
 - VoidMemoryStore.save() - Save Void memory

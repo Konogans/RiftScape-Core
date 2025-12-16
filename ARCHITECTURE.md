@@ -98,9 +98,13 @@ StructureRegistry   // Placeable structures registry
 PickupRegistry      // Loot pickups registry
 BehaviorSystem      // Enemy AI system
 AttackSystem        // Attack pattern system
-VoidBridge          // Void Entity API bridge
-VoidSystem          // Void Entity code execution system
-VoidMemoryStore     // Void Entity memory persistence
+```
+
+**Window Properties (Void Entity Systems):**
+```javascript
+window.VoidBridge          // Void Entity API bridge
+window.VoidSystem          // Void Entity code execution system
+window.VoidMemoryStore     // Void Entity memory persistence
 ```
 
 ### Access Patterns
@@ -148,7 +152,7 @@ window.RiftScape = {
 
 **Note:** `EquipmentRegistry` and `NPCRegistry` are defined as `const` globals (not on `window`) and are accessible directly. They are not currently in the `window.RiftScape` namespace, but can be accessed as bare globals: `EquipmentRegistry.get('battleaxe')` or `NPCRegistry.get('pedalboard')`.
 
-**Void Entity Systems:** `VoidBridge`, `VoidSystem`, and `VoidMemoryStore` are also `const` globals (not on `window`) and are accessible directly for Void Entity functionality.
+**Void Entity Systems:** `VoidBridge`, `VoidSystem`, and `VoidMemoryStore` are available on `window` (e.g., `window.VoidBridge`) for Void Entity functionality.
 
 **Backward Compatibility:** All existing `window.*` access still works. New code should prefer `window.RiftScape.*` to reduce global namespace pollution.
 

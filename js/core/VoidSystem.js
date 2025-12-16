@@ -482,6 +482,105 @@ const VoidSystem = {
         });
 
         return probeResult;
+    },
+
+    /**
+     * Reads source code of functions, methods, or entire objects
+     * Useful for understanding implementation before modifying
+     * @param {string} path - Dot-notation path to the target (e.g., "window.game.player.takeDamage", "EntityRegistry.get")
+     * @returns {{ ok: boolean, source?: string, type?: string, error?: string, methods?: string[] }}
+     */
+    readSource(path) {
+        if (!path || typeof path !== 'string') {
+            return { ok: false, error: 'Path must be a non-empty string' };
+        }
+
+        try {
+            // Safely evaluate the path
+            const parts = path.split('.');
+            let target;
+
+            // Handle starting point
+            if (parts[0] === 'window') {
+                target = window;
+                parts.shift();
+            } else {
+                // Try as bare global first
+                try {
+                    target = eval(parts[0]);
+                    parts.shift();
+                } catch (e) {
+                    // Try on window
+                    if (typeof window !== 'undefined' && window[parts[0]]) {
+                        target = window[parts[0]];
+                        parts.shift();
+                    } else {
+                        return { ok: false, error: `Cannot resolve starting point: ${parts[0]}` };
+                    }
+                }
+            }
+
+            // Navigate the path
+            for (const part of parts) {
+                if (target === null || target === undefined) {
+                    return { ok: false, error: `Path broken at: ${part}` };
+                }
+                target = target[part];
+            }
+
+            if (target === null || target === undefined) {
+                return { ok: false, error: `Target is null or undefined` };
+            }
+
+            const targetType = typeof target;
+
+            // If it's a function, return its source
+            if (targetType === 'function') {
+                return {
+                    ok: true,
+                    type: 'function',
+                    source: target.toString()
+                };
+            }
+
+            // If it's an object, list its methods and optionally their sources
+            if (targetType === 'object') {
+                const methods = Object.keys(target).filter(k => typeof target[k] === 'function');
+                const properties = Object.keys(target).filter(k => typeof target[k] !== 'function');
+
+                // Build a summary with method signatures
+                const methodSources = {};
+                methods.slice(0, 20).forEach(m => { // Limit to 20 methods to avoid huge output
+                    try {
+                        const src = target[m].toString();
+                        // Extract just the first line (signature) for summary
+                        const firstLine = src.split('\n')[0];
+                        methodSources[m] = firstLine.length > 100 ? firstLine.substring(0, 100) + '...' : firstLine;
+                    } catch (e) {
+                        methodSources[m] = '[unable to read]';
+                    }
+                });
+
+                return {
+                    ok: true,
+                    type: 'object',
+                    methods: methods,
+                    properties: properties.slice(0, 30), // Limit properties too
+                    methodSignatures: methodSources,
+                    hint: 'Use readSource("path.methodName") to get full source of a specific method'
+                };
+            }
+
+            // For primitives, just return the value
+            return {
+                ok: true,
+                type: targetType,
+                value: String(target).substring(0, 500) // Truncate long strings
+            };
+
+        } catch (e) {
+            return { ok: false, error: e.message };
+        }
     }
 };
 
